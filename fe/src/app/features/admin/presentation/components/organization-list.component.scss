@@ -1,0 +1,867 @@
+@use '../../../../../styles/variables' as *;
+
+/* ===== PAGE ===== */
+.org-list-page {
+  background: $bg-page;
+  min-height: 100vh;
+}
+
+.org-list-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: $spacing-6;
+}
+
+/* ===== HEADER ===== */
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: $spacing-6;
+}
+
+/* ===== KPI STRIP =====
+   F-ORG-1: 4 cards top, mirrors dashboard / users family pattern.
+   Uses shared <app-kpi-card> so visual contract is consistent.
+*/
+.kpi-strip {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: $spacing-4;
+  margin-bottom: $spacing-6;
+
+  @media (min-width: 640px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  @media (min-width: 1024px) {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.page-header-text {
+  h1 {
+    font-size: $text-2xl;
+    font-weight: $font-bold;
+    color: $text-primary;
+    margin: 0;
+    line-height: $leading-tight;
+  }
+
+  p {
+    font-size: $text-sm;
+    color: $text-muted;
+    margin: $spacing-1 0 0;
+  }
+}
+
+/* ===== BUTTONS ===== */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: $spacing-2;
+  padding: $spacing-2 $spacing-4;
+  background: $blue-primary;
+  color: $text-inverse;
+  border: none;
+  border-radius: $radius-xl;
+  font-size: $text-sm;
+  font-weight: $font-medium;
+  cursor: pointer;
+  box-shadow: $shadow-sm;
+  transition: background $transition-normal;
+
+  &:hover {
+    background: $blue-hover;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .icon {
+    width: $icon-sm;
+    height: $icon-sm;
+  }
+}
+
+.btn-ghost {
+  padding: $spacing-2 $spacing-5;
+  color: $text-secondary;
+  background: none;
+  border: none;
+  border-radius: $radius-xl;
+  font-size: $text-sm;
+  cursor: pointer;
+  transition: color $transition-normal, background $transition-normal;
+
+  &:hover {
+    color: $text-primary;
+    background: $gray-50;
+  }
+}
+
+/* ===== CREATE FORM ===== */
+.create-form-card {
+  background: $bg-surface;
+  border-radius: $radius-xl;
+  border: 1px solid $border-default;
+  box-shadow: $shadow-sm;
+  padding: $spacing-6;
+  margin-bottom: $spacing-6;
+  animation: fade-in 0.2s ease-out;
+}
+
+.create-form-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: $spacing-5;
+
+  h3 {
+    font-size: $text-lg;
+    font-weight: $font-semibold;
+    color: $text-primary;
+    margin: 0;
+  }
+}
+
+.btn-close {
+  padding: $spacing-1;
+  border-radius: $radius-lg;
+  background: none;
+  border: none;
+  color: $text-disabled;
+  cursor: pointer;
+  transition: background $transition-normal, color $transition-normal;
+  display: flex;
+  align-items: center;
+
+  &:hover {
+    background: $bg-hover;
+    color: $text-secondary;
+  }
+
+  .icon {
+    width: $icon-md;
+    height: $icon-md;
+  }
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: $spacing-4;
+
+  @include tablet {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.form-field-full {
+  @include tablet {
+    grid-column: 1 / -1;
+  }
+}
+
+.form-label {
+  display: block;
+  font-size: $text-sm;
+  font-weight: $font-medium;
+  color: $gray-700;
+  margin-bottom: 6px;
+
+  .required {
+    color: $error;
+  }
+}
+
+.form-input,
+.form-textarea {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid $border-dark;
+  border-radius: $radius-xl;
+  font-size: $text-sm;
+  color: $text-primary;
+  background: $bg-surface;
+  transition: border-color $transition-normal, box-shadow $transition-normal;
+  box-sizing: border-box;
+
+  &::placeholder {
+    color: $text-disabled;
+  }
+
+  &:focus {
+    outline: none;
+    border-color: $blue-primary;
+    box-shadow: 0 0 0 3px rgba($blue-primary, 0.12);
+  }
+}
+
+.form-input-uppercase {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.form-hint {
+  font-size: $text-xs;
+  color: $text-disabled;
+  margin-top: $spacing-1;
+}
+
+.form-actions {
+  display: flex;
+  align-items: center;
+  gap: $spacing-3;
+  margin-top: $spacing-5;
+  padding-top: $spacing-4;
+  border-top: 1px solid $border-light;
+}
+
+/* ===== SPINNER ===== */
+.spinner-icon {
+  animation: spin 1s linear infinite;
+  width: $icon-sm;
+  height: $icon-sm;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ===== LOADING ===== */
+.loading-container {
+  text-align: center;
+  padding: $spacing-16 0;
+}
+
+.loading-spinner {
+  display: inline-block;
+  width: 40px;
+  height: 40px;
+  border: 4px solid $blue-primary;
+  border-top-color: transparent;
+  border-radius: $radius-full;
+  animation: spin 0.8s linear infinite;
+}
+
+.loading-text {
+  margin-top: $spacing-4;
+  font-size: $text-sm;
+  color: $text-muted;
+}
+
+/* ===== ORG CARD LIST ===== */
+.org-grid {
+  display: grid;
+  gap: $spacing-4;
+}
+
+.org-card {
+  display: block;
+  background: $bg-surface;
+  border-radius: $radius-xl;
+  border: 1px solid $border-default;
+  box-shadow: $shadow-sm;
+  padding: $spacing-5;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color $transition-normal, box-shadow $transition-normal;
+
+  &:hover {
+    border-color: rgba($blue-primary, 0.3);
+    box-shadow: $shadow-md;
+  }
+}
+
+.org-card-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.org-card-left {
+  display: flex;
+  align-items: center;
+  gap: $spacing-4;
+  min-width: 0;
+}
+
+.org-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: $radius-xl;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: $text-inverse;
+  font-weight: $font-bold;
+  font-size: $text-lg;
+  flex-shrink: 0;
+
+  &--active {
+    background: linear-gradient(135deg, $blue-primary, $blue-hover);
+  }
+
+  &--disabled {
+    background: $gray-400;
+  }
+}
+
+.org-info {
+  min-width: 0;
+}
+
+.org-name {
+  font-size: $text-base;
+  font-weight: $font-semibold;
+  color: $text-primary;
+  transition: color $transition-normal;
+  @include truncate;
+
+  .org-card:hover & {
+    color: $blue-primary;
+  }
+}
+
+.org-meta {
+  display: flex;
+  align-items: center;
+  gap: $spacing-3;
+  margin-top: 2px;
+  font-size: $text-sm;
+  color: $text-muted;
+}
+
+.org-code {
+  font-family: $font-family-mono;
+  font-size: $text-xs;
+  background: $gray-100;
+  padding: 2px 6px;
+  border-radius: $radius-sm;
+}
+
+.dot-separator {
+  color: $gray-300;
+}
+
+.org-card-right {
+  display: flex;
+  align-items: center;
+  gap: $spacing-3;
+  flex-shrink: 0;
+  margin-left: $spacing-4;
+}
+
+/* ===== BADGES ===== */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  font-size: $text-xs;
+  font-weight: $font-medium;
+  border-radius: $radius-full;
+  border: 1px solid;
+  white-space: nowrap;
+
+  &--active {
+    background: #ECFDF5;
+    color: #047857;
+    border-color: #A7F3D0;
+  }
+
+  &--disabled {
+    background: $gray-50;
+    color: $text-muted;
+    border-color: $border-default;
+  }
+}
+
+.chevron-icon {
+  width: $icon-md;
+  height: $icon-md;
+  color: $gray-300;
+  transition: color $transition-normal;
+
+  .org-card:hover & {
+    color: $blue-primary;
+  }
+}
+
+.org-description {
+  margin-top: 10px;
+  font-size: $text-sm;
+  color: $text-muted;
+  padding-left: 64px; /* avatar width + gap */
+  @include line-clamp(1);
+}
+
+/* ===== EMPTY STATE ===== */
+.empty-state {
+  text-align: center;
+  padding: $spacing-16 $spacing-4;
+  background: $bg-surface;
+  border-radius: $radius-xl;
+  border: 1px solid $border-default;
+  box-shadow: $shadow-sm;
+}
+
+.empty-icon-wrapper {
+  width: 64px;
+  height: 64px;
+  background: rgba($blue-primary, 0.1);
+  border-radius: $radius-xl;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto $spacing-4;
+
+  .icon {
+    width: $icon-xl;
+    height: $icon-xl;
+    color: $blue-primary;
+  }
+}
+
+.empty-title {
+  font-size: $text-lg;
+  font-weight: $font-semibold;
+  color: $text-primary;
+  margin: 0 0 $spacing-1;
+}
+
+.empty-desc {
+  font-size: $text-sm;
+  color: $text-muted;
+  margin: 0 0 $spacing-5;
+}
+
+/* ===== SKELETON ===== */
+.sk {
+  background: $gray-200;
+  border-radius: $radius-sm;
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+.sk-light {
+  background: $gray-100;
+  border-radius: $radius-sm;
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* ===== ANIMATIONS ===== */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: #{$breakpoint-md - 1}) {
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: $spacing-3;
+  }
+
+  .org-list-inner {
+    padding: $spacing-4;
+  }
+
+  .org-card-right {
+    .badge { display: none; }
+  }
+
+  .org-description {
+    padding-left: 0;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: #{$breakpoint-sm - 1}) {
+  .org-list-inner {
+    padding: $spacing-3;
+  }
+
+  .page-header-text h1 {
+    font-size: $text-xl;
+  }
+
+  .org-card {
+    padding: $spacing-4;
+  }
+
+  .org-avatar {
+    width: 40px;
+    height: 40px;
+    font-size: $text-base;
+  }
+
+  .org-description {
+    padding-left: 56px;
+  }
+}
+
+/* Ultra-small */
+@media (max-width: 340px) {
+  .org-list-inner {
+    padding: $spacing-2;
+  }
+
+  .org-card {
+    padding: $spacing-3;
+  }
+
+  .org-meta {
+    flex-wrap: wrap;
+    gap: $spacing-1;
+  }
+
+  .org-card-right .chevron-icon {
+    display: none;
+  }
+}
+
+/* =====================================================================
+   Issue #254 (Phase 4): filter bar + type badge + default star
+   ===================================================================== */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: $spacing-3;
+  margin-bottom: $spacing-4;
+  flex-wrap: wrap;
+}
+
+.filter-search {
+  flex: 1;
+  min-width: 240px;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.filter-icon {
+  position: absolute;
+  left: 12px;
+  width: 16px;
+  height: 16px;
+  color: #6b7280;
+  pointer-events: none;
+}
+
+.filter-search-input {
+  flex: 1;
+  height: 38px;
+  padding: 0 12px 0 36px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: white;
+  font-size: 14px;
+  color: #111827;
+  transition: border-color 0.15s ease;
+
+  &:focus {
+    outline: none;
+    border-color: #0056D2;
+    box-shadow: 0 0 0 3px rgba(0, 86, 210, 0.1);
+  }
+
+  &::placeholder { color: #9ca3af; }
+}
+
+.filter-type-select {
+  height: 38px;
+  padding: 0 32px 0 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: white;
+  font-size: 14px;
+  color: #111827;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  min-width: 160px;
+
+  &:focus {
+    outline: none;
+    border-color: #0056D2;
+    box-shadow: 0 0 0 3px rgba(0, 86, 210, 0.1);
+  }
+}
+
+.filter-clear {
+  background: none;
+  border: 1px solid #e5e7eb;
+  color: #6b7280;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    border-color: #0056D2;
+    color: #0056D2;
+    background: rgba(0, 86, 210, 0.04);
+  }
+}
+
+/* Type badges — consistent với Phase 2 org-detail. Inline trong org-meta. */
+.badge-org-type {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border: 1px solid transparent;
+  line-height: 1.4;
+}
+.badge-org-type--platform {
+  background: rgba(0, 86, 210, 0.08);
+  color: #0056D2;
+  border-color: rgba(0, 86, 210, 0.2);
+}
+.badge-org-type--partner {
+  background: rgba(124, 58, 237, 0.08);
+  color: #6D28D9;
+  border-color: rgba(124, 58, 237, 0.2);
+}
+.badge-org-type--internal {
+  background: #f3f4f6;
+  color: #4b5563;
+  border-color: #e5e7eb;
+}
+
+/* Default org indicator pulse — reuse Phase 3 keyframe */
+.default-star {
+  font-size: 0.85em;
+  margin-left: 4px;
+  cursor: help;
+  display: inline-block;
+  animation: default-star-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes default-star-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .default-star {
+    animation: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .filter-search { min-width: 0; }
+  .filter-type-select { width: 100%; }
+}
+
+/* =====================================================================
+   Issue #260 (Phase 4 PR 4): cross-org revenue dashboard
+   ===================================================================== */
+.revenue-section {
+  margin-bottom: $spacing-6;
+  padding: $spacing-5;
+  background: white;
+  border: 1px solid $border-default;
+  border-radius: $radius-xl;
+  box-shadow: $shadow-sm;
+}
+
+.revenue-header {
+  margin-bottom: $spacing-4;
+}
+
+.revenue-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 4px 0;
+}
+
+.revenue-subtitle {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 0;
+}
+
+.revenue-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: $spacing-3;
+  margin-bottom: $spacing-5;
+
+  @media (max-width: 1024px) { grid-template-columns: repeat(2, 1fr); }
+  @media (max-width: 640px) { grid-template-columns: 1fr; }
+}
+
+.revenue-card {
+  padding: $spacing-3 $spacing-4;
+  background: #f9fafb;
+  border: 1px solid $border-default;
+  border-radius: $radius-lg;
+  transition: border-color 0.15s ease;
+
+  &:hover {
+    border-color: rgba(0, 86, 210, 0.25);
+  }
+}
+
+.revenue-card--gross {
+  background: linear-gradient(135deg, rgba(0, 86, 210, 0.04), rgba(0, 86, 210, 0.01));
+  border-color: rgba(0, 86, 210, 0.2);
+}
+
+.revenue-card-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b7280;
+  margin-bottom: 6px;
+}
+
+.revenue-card-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+  font-variant-numeric: tabular-nums;
+}
+
+.revenue-card--gross .revenue-card-value {
+  color: #0056D2;
+}
+
+/* Top orgs ranking */
+.top-orgs-card {
+  background: #fafafa;
+  border: 1px solid $border-default;
+  border-radius: $radius-lg;
+  padding: $spacing-4;
+}
+
+.top-orgs-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 $spacing-3 0;
+}
+
+.top-orgs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.top-org-row {
+  display: flex;
+  align-items: center;
+  gap: $spacing-3;
+  padding: $spacing-3;
+  background: white;
+  border: 1px solid transparent;
+  border-radius: $radius-md;
+  text-decoration: none;
+  transition: all 0.15s ease;
+
+  &:hover {
+    border-color: rgba(0, 86, 210, 0.25);
+    background: rgba(0, 86, 210, 0.02);
+  }
+
+  &:focus-visible {
+    outline: 2px solid #0056D2;
+    outline-offset: 2px;
+  }
+}
+
+.top-org-rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(0, 86, 210, 0.08);
+  color: #0056D2;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.top-org-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.top-org-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.top-org-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.top-org-code {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  background: rgba(0, 0, 0, 0.04);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.top-org-revenue {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0056D2;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ===== PRINT ===== */
+@media print {
+  .org-list-page {
+    background: white;
+  }
+
+  .page-header .btn-primary,
+  .create-form-card,
+  .btn-close,
+  .filter-bar,
+  .chevron-icon {
+    display: none !important;
+  }
+
+  .org-card {
+    box-shadow: none;
+    border: 1px solid #ddd;
+    page-break-inside: avoid;
+  }
+}

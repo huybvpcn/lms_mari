@@ -1,0 +1,265 @@
+<div class="org-list-page">
+  <div class="org-list-inner">
+    <!-- Header -->
+    <div class="page-header">
+      <div class="page-header-text">
+        <h1>Quản lý tổ chức</h1>
+        <p>Quản lý các tổ chức, thành viên và lời mời</p>
+      </div>
+      @if (canCreateOrganizations()) {
+        <button (click)="showCreateForm.set(!showCreateForm())" class="btn-primary">
+          <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+          </svg>
+          Tạo tổ chức
+        </button>
+      }
+    </div>
+
+    @if (stats(); as s) {
+      <!-- KPI strip — F-ORG-1, mirrors dashboard / users family pattern via shared kpi-card -->
+      <div class="kpi-strip">
+        <app-kpi-card label="Tổng tổ chức" [value]="s.totalOrgs" />
+        <app-kpi-card label="Đang hoạt động" [value]="s.activeOrgs" variant="success" />
+        <app-kpi-card label="Thành viên" [value]="s.totalMembers" sub="trong các tổ chức" />
+        <app-kpi-card label="Lời mời còn hiệu lực" [value]="s.activeInvites" sub="chưa hết hạn" />
+      </div>
+    }
+
+    <!-- Issue #260 (Phase 4 PR 4): Cross-org revenue dashboard (ADMIN only) -->
+    @if (revenueStats(); as rev) {
+      <section class="revenue-section" aria-labelledby="revenue-heading">
+        <div class="revenue-header">
+          <h2 id="revenue-heading" class="revenue-title">Tổng quan doanh thu (toàn nền tảng)</h2>
+          <p class="revenue-subtitle">Aggregate doanh thu từ V83 revenue_splits ledger — all-time</p>
+        </div>
+        <div class="revenue-cards">
+          <div class="revenue-card revenue-card--gross">
+            <div class="revenue-card-label">Tổng doanh thu (gross)</div>
+            <div class="revenue-card-value">{{ formatVnd(rev.totalGrossRevenue) }}</div>
+          </div>
+          <div class="revenue-card">
+            <div class="revenue-card-label">Phí nền tảng</div>
+            <div class="revenue-card-value">{{ formatVnd(rev.totalPlatformFees) }}</div>
+          </div>
+          <div class="revenue-card">
+            <div class="revenue-card-label">Trả giảng viên</div>
+            <div class="revenue-card-value">{{ formatVnd(rev.totalTeacherPayouts) }}</div>
+          </div>
+          <div class="revenue-card">
+            <div class="revenue-card-label">Trả tổ chức</div>
+            <div class="revenue-card-value">{{ formatVnd(rev.totalOrgPayouts) }}</div>
+          </div>
+        </div>
+
+        @if (rev.topOrgs.length > 0) {
+          <div class="top-orgs-card">
+            <h3 class="top-orgs-title">Top {{ rev.topOrgs.length }} tổ chức theo doanh thu</h3>
+            <div class="top-orgs-list">
+              @for (org of rev.topOrgs; track org.orgId; let i = $index) {
+                <a [routerLink]="['/admin/organizations', org.orgId]" class="top-org-row">
+                  <span class="top-org-rank">#{{ i + 1 }}</span>
+                  <div class="top-org-info">
+                    <div class="top-org-name">
+                      {{ org.name }}
+                      @if (org.isDefault) {
+                        <span class="default-star" title="Tổ chức nền tảng" aria-label="Tổ chức nền tảng">⭐</span>
+                      }
+                    </div>
+                    <div class="top-org-meta">
+                      <span [class]="typeMetaFor(org.type).cssClass">{{ typeMetaFor(org.type).label }}</span>
+                      <span class="dot-separator">&middot;</span>
+                      <span class="top-org-code">{{ org.code }}</span>
+                    </div>
+                  </div>
+                  <span class="top-org-revenue">{{ formatVnd(org.totalRevenue) }}</span>
+                </a>
+              }
+            </div>
+          </div>
+        }
+      </section>
+    }
+
+    <!-- Create Form (inline card) -->
+    @if (canCreateOrganizations() && showCreateForm()) {
+      <div class="create-form-card">
+        <div class="create-form-header">
+          <h3>Tạo tổ chức mới</h3>
+          <button (click)="showCreateForm.set(false)" class="btn-close">
+            <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+        <div class="form-grid">
+          <div>
+            <label for="create-name" class="form-label">Tên tổ chức <span class="required">*</span></label>
+            <input #orgName id="create-name" type="text" placeholder="VD: Đại học Hàng hải Việt Nam"
+                   class="form-input">
+          </div>
+          <div>
+            <label for="create-code" class="form-label">Mã tổ chức <span class="required">*</span></label>
+            <input #orgCode id="create-code" type="text" placeholder="VD: VMU" maxlength="50"
+                   class="form-input form-input-uppercase">
+            <p class="form-hint">2-50 ký tự, dùng để định danh tổ chức</p>
+          </div>
+          <div class="form-field-full">
+            <label for="create-desc" class="form-label">Mô tả</label>
+            <textarea #orgDesc id="create-desc" rows="2" placeholder="Mô tả ngắn về tổ chức (không bắt buộc)"
+                      class="form-textarea"></textarea>
+          </div>
+          <div>
+            <label for="create-expiry" class="form-label">Thời hạn token (ngày)</label>
+            <input #orgExpiry id="create-expiry" type="number" value="30" min="7" max="730"
+                   class="form-input">
+            <p class="form-hint">7 - 730 ngày. Thời gian token đăng nhập hợp lệ</p>
+          </div>
+          <div>
+            <label for="create-type" class="form-label">Loại tổ chức</label>
+            <select #orgType id="create-type" class="form-input">
+              @for (opt of typeCreateOptions; track opt.value) {
+                <option [value]="opt.value">{{ opt.label }}</option>
+              }
+            </select>
+            <p class="form-hint">Đối tác cho tổ chức bên ngoài, Nội bộ cho đơn vị thuộc nền tảng</p>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button (click)="createOrg(orgName.value, orgCode.value, orgDesc.value, +orgExpiry.value, orgType.value)"
+                  [disabled]="isCreating()"
+                  class="btn-primary">
+            @if (isCreating()) {
+              <svg class="spinner-icon" fill="none" viewBox="0 0 24 24">
+                <circle opacity="0.25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path opacity="0.75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Đang tạo...
+            } @else {
+              Tạo tổ chức
+            }
+          </button>
+          <button (click)="showCreateForm.set(false)" class="btn-ghost">
+            Hủy
+          </button>
+        </div>
+      </div>
+    }
+
+    <!-- Loading -->
+    @if (isLoading()) {
+      <div class="loading-container">
+        <div class="loading-spinner"></div>
+        <p class="loading-text">Đang tải danh sách tổ chức...</p>
+      </div>
+    } @else {
+      <!-- Issue #254 (Phase 4): Type filter + search bar (ADMIN only — vì
+           ORG_ADMIN chỉ có 1 org, filter vô nghĩa) -->
+      @if (canCreateOrganizations() && organizations().length > 0) {
+        <div class="filter-bar">
+          <div class="filter-search">
+            <svg class="filter-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+            </svg>
+            <input #searchInput type="search" placeholder="Tìm theo tên hoặc mã tổ chức..."
+                   class="filter-search-input"
+                   [value]="searchQuery()"
+                   (input)="setSearchQuery(searchInput.value)">
+          </div>
+          <select #typeSelect class="filter-type-select"
+                  [value]="typeFilter()"
+                  (change)="setTypeFilter(typeSelect.value)">
+            @for (opt of typeFilterOptions; track opt.value) {
+              <option [value]="opt.value">{{ opt.label }}</option>
+            }
+          </select>
+          @if (hasActiveFilters()) {
+            <button type="button" class="filter-clear" (click)="clearFilters()">
+              Xóa bộ lọc
+            </button>
+          }
+        </div>
+      }
+
+      <!-- Org List (paginated #256) -->
+      <div class="org-grid">
+        @for (org of paginatedOrganizations(); track org.id) {
+          <a [routerLink]="['/admin/organizations', org.id]" class="org-card">
+            <div class="org-card-row">
+              <div class="org-card-left">
+                <div class="org-avatar" [class.org-avatar--active]="org.enabled" [class.org-avatar--disabled]="!org.enabled">
+                  {{ org.code.substring(0, 2) }}
+                </div>
+                <div class="org-info">
+                  <div class="org-name">
+                    {{ org.name }}
+                    @if (org.isDefault) {
+                      <span class="default-star" title="Tổ chức nền tảng — không thể xóa" aria-label="Tổ chức nền tảng">⭐</span>
+                    }
+                  </div>
+                  <div class="org-meta">
+                    <span [class]="typeMetaFor(org.type).cssClass">{{ typeMetaFor(org.type).label }}</span>
+                    <span class="dot-separator">&middot;</span>
+                    <span class="org-code">{{ org.code }}</span>
+                    <span class="dot-separator">&middot;</span>
+                    <span title="Thời hạn token đăng nhập của thành viên trong tổ chức">
+                      Hạn token: {{ org.tokenExpiryDays }} ngày
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div class="org-card-right">
+                @if (org.enabled) {
+                  <span class="badge badge--active">Hoạt động</span>
+                } @else {
+                  <span class="badge badge--disabled">Vô hiệu</span>
+                }
+                <svg class="chevron-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+              </div>
+            </div>
+            @if (org.description) {
+              <p class="org-description">{{ org.description }}</p>
+            }
+          </a>
+        } @empty {
+          <!-- Empty State — phân biệt no results filter vs truly empty list -->
+          <div class="empty-state">
+            <div class="empty-icon-wrapper">
+              <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+              </svg>
+            </div>
+            @if (hasActiveFilters()) {
+              <h3 class="empty-title">Không tìm thấy tổ chức phù hợp</h3>
+              <p class="empty-desc">Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm</p>
+              <button type="button" (click)="clearFilters()" class="btn-ghost">Xóa bộ lọc</button>
+            } @else {
+              <h3 class="empty-title">Chưa có tổ chức nào</h3>
+              <p class="empty-desc">Tạo tổ chức đầu tiên để bắt đầu quản lý thành viên</p>
+              @if (canCreateOrganizations()) {
+                <button (click)="showCreateForm.set(true)" class="btn-primary">
+                  <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                  </svg>
+                  Tạo tổ chức đầu tiên
+                </button>
+              }
+            }
+          </div>
+        }
+      </div>
+
+      <!-- Pagination (#256) — chỉ render khi có hơn 1 trang -->
+      @if (paginationInfo().totalPages > 1) {
+        <app-pagination
+          [currentPage]="currentPage()"
+          [totalPages]="paginationInfo().totalPages"
+          [totalItems]="paginationInfo().totalItems"
+          [itemsPerPage]="pageSize"
+          (pageChange)="onPageChange($event)" />
+      }
+    }
+  </div>
+</div>

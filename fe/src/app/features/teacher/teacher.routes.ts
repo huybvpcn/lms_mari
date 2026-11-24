@@ -1,0 +1,227 @@
+import { Routes } from '@angular/router';
+import { teacherGuard, teacherOnlyGuard } from '../../core/guards/role.guard';
+import { quizRoutes, quizStandaloneRoutes } from './quiz/quiz.routes';
+
+/**
+ * Teacher Routes Configuration
+ * 
+ * Cấu trúc routing đơn giản và chuyên nghiệp cho Teacher features
+ * - Flat structure để dễ maintain
+ * - Consistent naming conventions
+ * - Clear hierarchy và organization
+ * - Proper lazy loading cho performance
+ * 
+ * REFACTORED: Hợp nhất courses và course-editor
+ * - /teacher/courses → Danh sách khóa học
+ * - /teacher/course-creation → Tạo khóa học mới
+ * - /teacher/courses/:id/editor/* → Chỉnh sửa khóa học (course-editor)
+ */
+export const teacherRoutes: Routes = [
+  // Standalone routes (không có sidebar) - phải đặt TRƯỚC layout routes
+  ...quizStandaloneRoutes,
+
+  // Course Preview — Teacher xem như học viên (reuse student CourseLearningComponent)
+  {
+    path: 'courses/:id/preview',
+    loadComponent: () => import('../learning/pages/course-learning.component').then(m => m.CourseLearningComponent),
+    canActivate: [teacherGuard],
+    data: { preview: true },
+    title: 'Xem trước như học viên'
+  },
+
+  // Course Editor - Standalone Layout (không có teacher sidebar)
+  {
+    path: 'courses/:id/editor',
+    loadChildren: () => import('./course-editor/course-editor.routes').then(m => m.courseEditorRoutes),
+    canActivate: [teacherGuard],
+    title: 'Chỉnh sửa khóa học'
+  },
+
+  // Competency Map — Standalone (full-screen matrix, no sidebar)
+  {
+    path: 'courses/:courseId/competency-map',
+    loadChildren: () =>
+      import('./competency-map/competency-map.routes').then((m) => m.competencyMapRoutes),
+    title: 'Bản đồ năng lực',
+  },
+
+  // Section Editor - Standalone (quản lý bài học trong chương)
+  {
+    path: 'courses/:courseId/sections/:sectionId',
+    loadComponent: () => import('./courses/section-editor/legacy-section-editor-redirect.component').then(m => m.LegacySectionEditorRedirectComponent),
+    canActivate: [teacherGuard],
+    title: 'Quản lý bài học'
+  },
+
+  // Layout routes (có sidebar) - ONLY for Teachers, Admin blocked
+  {
+    path: '',
+    loadComponent: () => import('./shared/teacher-layout-simple.component').then(m => m.TeacherLayoutSimpleComponent),
+    canActivate: [teacherOnlyGuard],
+    children: [
+      // Default redirect to courses (matching student pattern)
+      {
+        path: '',
+        redirectTo: 'courses',
+        pathMatch: 'full'
+      },
+
+      // Backward compat: /teacher/dashboard → /teacher/courses
+      {
+        path: 'dashboard',
+        redirectTo: 'courses',
+        pathMatch: 'full'
+      },
+
+      // Khóa học của tôi — Teacher home (matching student /student/courses)
+      {
+        path: 'courses',
+        loadComponent: () => import('./dashboard/teacher-dashboard.component').then(m => m.TeacherDashboardComponent),
+        title: 'Khóa học của tôi - Giảng viên'
+      },
+
+      // Tất cả khóa học — Full course management (matching student /student/courses/library)
+      {
+        path: 'courses/library',
+        loadComponent: () => import('./courses/course-management.component').then(m => m.CourseManagementComponent),
+        title: 'Tất cả khóa học'
+      },
+      {
+        path: 'course-creation',
+        loadComponent: () => import('./courses/course-creation.component').then(m => m.CourseCreationComponent),
+        title: 'Tạo khóa học mới',
+        canDeactivate: [(component: any) => component.canDeactivate()]
+      },
+
+      // TipTap Editor Demo (temporary — remove after migration)
+      {
+        path: 'editor-demo',
+        loadComponent: () => import('../../shared/components/tiptap-editor/tiptap-demo.component').then(m => m.TiptapDemoComponent),
+        title: 'TipTap Editor Demo'
+      },
+
+      // Assignment Hub Routes (Unified Assignment + Grading)
+      {
+        path: 'assessments',
+        loadChildren: () => import('./assignment-hub/assignment-hub.routes').then(m => m.assignmentHubRoutes)
+      },
+      {
+        path: 'assignments',
+        redirectTo: 'assessments/classes/assignments',
+        pathMatch: 'full'
+      },
+
+      // Legacy routes (backward compatibility)
+      {
+        path: 'assignment-creation',
+        redirectTo: 'assessments/classes/assignments/create',
+        pathMatch: 'full'
+      },
+      {
+        path: 'courses/:courseId/sections/:sectionId/assignments/:assignmentId/submissions',
+        loadComponent: () => import('./assignments/assignment-submissions.component').then(m => m.AssignmentSubmissionsComponent),
+        title: 'Bài nộp của học viên'
+      },
+
+      // Student Management Routes
+      {
+        path: 'students',
+        loadComponent: () => import('./students/student-management.component').then(m => m.StudentManagementComponent),
+        title: 'Quản lý học viên'
+      },
+      {
+        path: 'classes/:classId/students',
+        loadComponent: () => import('./course-editor/pages/course-classes/class-students/class-students.component').then(m => m.ClassStudentsComponent),
+        title: 'Danh sách học viên'
+      },
+      {
+        path: 'students/:id',
+        loadComponent: () => import('./students/student-detail.component').then(m => m.StudentDetailComponent),
+        title: 'Chi tiết học viên'
+      },
+
+      // Quiz Management Routes
+      ...quizRoutes,
+
+
+      // Analytics Routes
+      {
+        path: 'analytics',
+        loadComponent: () => import('./analytics/teacher-analytics.component').then(m => m.TeacherAnalyticsComponent),
+        title: 'Phân tích giảng dạy'
+      },
+
+      // Revenue Routes
+      {
+        path: 'revenue',
+        loadComponent: () => import('./revenue/teacher-revenue-dashboard.component').then(m => m.TeacherRevenueDashboardComponent),
+        title: 'Doanh thu'
+      },
+      {
+        path: 'revenue/payouts',
+        loadComponent: () => import('./revenue/teacher-payout-history.component').then(m => m.TeacherPayoutHistoryComponent),
+        title: 'Lịch sử rút tiền'
+      },
+      {
+        path: 'revenue/bank-accounts',
+        loadComponent: () => import('./revenue/teacher-bank-accounts.component').then(m => m.TeacherBankAccountsComponent),
+        title: 'Tài khoản ngân hàng'
+      },
+
+      // Invitations Route
+      {
+        path: 'invitations',
+        loadComponent: () => import('./dashboard/my-invitations.component').then(m => m.MyInvitationsComponent),
+        title: 'Lời mời tham gia'
+      },
+
+      // Grading Routes (redirect to unified Assignment Hub)
+      {
+        path: 'grading',
+        redirectTo: 'assessments/classes/assignments',
+        pathMatch: 'full'
+      },
+      {
+        path: 'grading/speed-grader/:assignmentId',
+        redirectTo: 'assignments/:assignmentId/submissions',
+        pathMatch: 'full'
+      },
+      {
+        path: 'grading/speed-grader/:assignmentId/:submissionId',
+        redirectTo: 'assignments/:assignmentId/grade/:submissionId',
+        pathMatch: 'full'
+      },
+      {
+        path: 'grading/rubrics',
+        redirectTo: 'assessments/shared/rubrics',
+        pathMatch: 'full'
+      },
+      {
+        path: 'rubrics',
+        redirectTo: 'assessments/shared/rubrics',
+        pathMatch: 'full'
+      },
+
+      // Messaging — reuse student messaging components (same MessagingService)
+      {
+        path: 'messages',
+        loadChildren: () => import('../student/messages/messages.routes').then(m => m.MESSAGES_ROUTES),
+        title: 'Tin nhắn'
+      },
+
+      // Announcements — teacher manages course announcements
+      {
+        path: 'announcements',
+        loadComponent: () => import('./announcements/teacher-announcements.component').then(m => m.TeacherAnnouncementsComponent),
+        title: 'Thông báo'
+      },
+
+      // Profile — reuse shared profile component
+      {
+        path: 'profile',
+        loadComponent: () => import('../profile/student-profile.component').then(m => m.StudentProfileComponent),
+        title: 'Hồ sơ cá nhân'
+      },
+    ]
+  }
+];

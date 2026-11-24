@@ -1,0 +1,240 @@
+/**
+ * Learning Interface Models
+ * 
+ * TypeScript interfaces and types for the enhanced learning interface.
+ * These models map to the backend API responses and internal state.
+ */
+
+import { LessonType } from './lesson-types.enum';
+import type { InteractiveVideoSpec } from '../../../api/types/interactive-video.types';
+import type { SimulationSectionData } from '../../../api/types/simulation.types';
+
+/**
+ * Course Overview
+ * Used in the course overview page before starting to learn
+ */
+export interface CourseOverview {
+  id: string;
+  title: string;
+  description: string;
+  instructor: string;
+  thumbnail: string;
+  sectionsCount: number;
+  lessonsCount: number;
+  duration: string;
+  isEnrolled: boolean;
+  isOfflinePackage?: boolean;
+  isStale?: boolean;
+  staleReason?: 'UPDATE_AVAILABLE' | 'CLASS_ADOPTED_NEW_PUBLICATION' | 'LEGACY_PACKAGE' | 'UNKNOWN' | null;
+}
+
+/**
+ * Section
+ * Represents a chapter/module containing multiple lessons
+ */
+export interface Section {
+  id: string;
+  title: string;
+  description: string;
+  orderIndex: number;
+  lessons: LessonSummary[];
+}
+
+/**
+ * Lesson Summary
+ * Brief lesson information for navigation lists
+ */
+export interface LessonSummary {
+  id: string;
+  title: string;
+  description: string;
+  lessonType?: LessonType;
+  duration: number; // in minutes
+  orderIndex: number;
+  isCompleted?: boolean; // Added for progress tracking
+  isFree?: boolean; // Lesson is free (accessible without payment)
+  locked?: boolean; // Lesson content is locked (requires payment)
+  quizType?: string;
+  countsTowardCertificate?: boolean;
+  quizAllowOffline?: boolean;
+  sections?: SectionContent[]; // L3 content blocks from API
+}
+
+/**
+ * Section Content (Level 3)
+ * Actual content within a lesson
+ */
+export interface SectionContent {
+  id: string;
+  title: string;
+  type: 'VIDEO' | 'TEXT' | 'QUIZ' | 'FILE' | 'ASSIGNMENT' | 'SIMULATION';
+  content?: string;
+  structuredContent?: Record<string, unknown> | null;
+  videoAssetId?: string;
+  videoProcessingStatus?: string;
+  videoSourceKind?: 'ADAPTIVE_R2' | 'STREAM' | 'EXTERNAL' | 'LEGACY_DIRECT';
+  videoUrl?: string;
+  videoType?: 'YOUTUBE' | 'CLOUDFLARE' | 'ADAPTIVE_R2' | string;
+  streamVideoUid?: string;
+  videoOfflineUri?: string;
+  fileUrl?: string;
+  previewPdfUrl?: string;
+  previewStatus?: 'PROCESSING' | 'READY' | 'FAILED' | string | null;
+  duration?: number;
+  orderIndex: number;
+  isRequired: boolean;
+  completionThreshold?: number;
+  interactiveVideoSpec?: InteractiveVideoSpec | null;
+  quizData?: SectionQuizData;
+  simulationData?: SimulationSectionData | null;
+  simulationOfflineReady?: boolean;
+  simulationOfflineBytes?: number | null;
+  simulationOfflineAt?: string | null;
+  simulationOfflineError?: string | null;
+}
+
+export interface SectionQuizQuestionSummary {
+  id: string;
+  content: string;
+  difficulty?: 'EASY' | 'MEDIUM' | 'HARD' | string;
+}
+
+export interface SectionQuizData {
+  quizType?: string;
+  countsTowardCertificate?: boolean;
+  allowOffline?: boolean;
+  timeLimitMinutes?: number;
+  passingScore?: number;
+  maxAttempts?: number;
+  shuffleQuestions?: boolean;
+  shuffleOptions?: boolean;
+  showResultsImmediately?: boolean;
+  showCorrectAnswers?: boolean;
+  questions?: SectionQuizQuestionSummary[];
+}
+
+/**
+ * Lesson Detail
+ * Full lesson information including content and attachments
+ */
+export interface LessonDetail extends LessonSummary {
+  content: string; // HTML content (fallback)
+  videoUrl?: string; // Fallback video URL
+  streamVideoUid?: string; // Cloudflare Stream UID — use signed URL if present
+  videoOfflineUri?: string;
+  quizType?: string;
+  countsTowardCertificate?: boolean;
+  quizAllowOffline?: boolean;
+  thumbnail?: string;
+  attachments: LessonAttachment[];
+  sectionId: string;
+  sectionTitle: string;
+  courseId: string;
+  courseTitle: string;
+  durationMinutes?: number;
+  sections?: SectionContent[]; // Level 3 sections
+}
+
+/**
+ * Lesson Attachment
+ * File attached to a lesson (PDF, Office docs, images, videos, etc.)
+ */
+export interface LessonAttachment {
+  id: string;
+  originalFileName: string;
+  fileUrl: string;
+  fileSize: number;
+  fileType: string; // API returns string, not enum
+}
+
+/**
+ * Progress State
+ * Tracks student's learning progress
+ */
+export interface ProgressState {
+  completedLessons: Set<string>;
+  progressPercentage: number;
+  lastAccessedLessonId?: string;
+}
+
+/**
+ * Course State
+ * State for course data and loading status
+ */
+export interface CourseState {
+  course: CourseOverview | null;
+  sections: Section[];
+  loading: boolean;
+  error: string | null;
+}
+
+/**
+ * Lesson State
+ * State for current lesson data and loading status
+ */
+export interface LessonState {
+  currentLesson: LessonDetail | null;
+  loading: boolean;
+  error: string | null;
+}
+
+/**
+ * Video Player State
+ * State for video playback
+ */
+export interface VideoPlayerState {
+  isPlaying: boolean;
+  currentTime: number;
+  duration: number;
+  volume: number;
+  playbackRate: number;
+  isFullscreen: boolean;
+}
+
+/**
+ * Error Type
+ * Types of errors that can occur in the learning interface
+ */
+export type ErrorType = 'network' | 'forbidden' | 'notfound' | 'video' | 'unknown';
+
+/**
+ * Error State
+ * Detailed error information
+ */
+export interface ErrorState {
+  type: ErrorType;
+  message: string;
+  canRetry: boolean;
+  canEnroll: boolean;
+}
+
+/**
+ * Navigation State
+ * State for lesson navigation
+ */
+export interface NavigationState {
+  canGoPrevious: boolean;
+  canGoNext: boolean;
+  previousLessonId?: string;
+  nextLessonId?: string;
+}
+
+/**
+ * Search State
+ * State for lesson search functionality
+ */
+export interface SearchState {
+  query: string;
+  results: LessonSummary[];
+  isSearching: boolean;
+}
+
+/**
+ * Sidebar State
+ * State for sidebar visibility and behavior
+ */
+export interface SidebarState {
+  isCollapsed: boolean;
+  isMobileView: boolean;
+  isOverlayVisible: boolean;
+}

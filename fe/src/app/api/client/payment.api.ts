@@ -1,0 +1,184 @@
+import { Injectable, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment';
+
+/**
+ * Payment API Client
+ * 
+ * SOTA Design (Dec 2025):
+ * - Typed request/response interfaces
+ * - Support multiple payment methods (VNPay, ZaloPay, MoMo, Simulated)
+ * - Payment status checking and history
+ */
+
+// === REQUEST/RESPONSE TYPES ===
+
+export interface CheckoutRequest {
+    courseId: string;
+    amount: number;
+    paymentMethod: string;
+}
+
+export interface PaymentResponse {
+    id: string;
+    courseId: string;
+    courseTitle: string;
+    amount: number;
+    currency: string;
+    status: PaymentStatus;
+    transactionId: string | null;
+    paymentMethod: string | null;
+    paidAt: string | null;
+    createdAt: string | null;
+    accessActivationState: PaymentAccessActivationState | null;
+    accessActivationMessage: string | null;
+}
+
+export interface PaymentStatusResponse {
+    courseId: string;
+    hasPaid: boolean;
+    status: PaymentStatus | null;
+    freeLessonsCount: number | null;
+    transactionId: string | null;
+    paidAt: string | null;
+    accessActivationState: PaymentAccessActivationState | null;
+    accessActivationMessage: string | null;
+}
+
+export interface LessonAccessResponse {
+    courseId: string;
+    lessonIndex: number;
+    canAccess: boolean;
+    hasPaid: boolean;
+    message: string | null;
+}
+
+export interface ApiResponse<T> {
+    success: boolean;
+    data: T;
+    message: string;
+    error?: string;
+}
+
+export type PaymentStatus = 'PENDING' | 'COMPLETED' | 'FAILED' | 'EXPIRED' | 'REFUNDED' | 'UNPAID';
+export type PaymentAccessActivationState = 'READY' | 'MANUAL_ACTIVATION_REQUIRED' | 'ACCESS_PENDING';
+
+export type PaymentMethod = 'VNPAY' | 'SEPAY' | 'ZALOPAY' | 'MOMO' | 'BANK_TRANSFER' | 'SIMULATED';
+
+export interface SepayQrData {
+    txnId: string;
+    qrUrl: string;
+    transferContent: string;
+    bankCode: string;
+    accountNumber: string;
+    accountName: string;
+    amount: number;
+    courseTitle: string;
+}
+
+export interface SepayPollResponse {
+    txnId: string;
+    status: string;
+    hasPaid: boolean;
+}
+
+export interface PaymentGatewayAvailabilityResponse {
+    availableMethods: PaymentMethod[];
+    defaultMethod: PaymentMethod | null;
+    production: boolean;
+    hasAvailableMethod: boolean;
+    message: string | null;
+}
+
+import { IconName } from '../../shared/components/icon/icon.component';
+
+export const PAYMENT_METHODS: { code: PaymentMethod; name: string; icon: IconName; description: string }[] = [
+    { code: 'VNPAY', name: 'VNPay', icon: 'smartphone', description: 'Thanh toán qua VNPay' },
+    { code: 'SEPAY', name: 'SePay (Chuyển khoản QR)', icon: 'briefcase', description: 'Quét QR chuyển khoản ngân hàng' },
+    { code: 'ZALOPAY', name: 'ZaloPay', icon: 'smartphone', description: 'Thanh toán qua ZaloPay' },
+    { code: 'MOMO', name: 'MoMo', icon: 'smartphone', description: 'Thanh toán qua MoMo' },
+    { code: 'BANK_TRANSFER', name: 'Chuyển khoản', icon: 'briefcase', description: 'Chuyển khoản ngân hàng' },
+    { code: 'SIMULATED', name: 'Thanh toán nhanh', icon: 'zap', description: 'Thanh toán giả lập (Dev)' }
+];
+
+@Injectable({ providedIn: 'root' })
+export class PaymentApi {
+    private http = inject(HttpClient);
+    private baseUrl = `${environment.apiUrl}/api/v3/payments`;
+
+    /**
+     * Process checkout/payment
+     */
+    checkout(request: CheckoutRequest): Observable<ApiResponse<PaymentResponse>> {
+        return this.http.post<ApiResponse<PaymentResponse>>(`${this.baseUrl}/checkout`, request);
+    }
+
+    /**
+     * Get payment status for a course
+     */
+    getPaymentStatus(courseId: string): Observable<ApiResponse<PaymentStatusResponse>> {
+        return this.http.get<ApiResponse<PaymentStatusResponse>>(`${this.baseUrl}/status/${courseId}`);
+    }
+
+    /**
+     * Get payment history for current user
+     */
+    getMyPayments(): Observable<ApiResponse<PaymentResponse[]>> {
+        return this.http.get<ApiResponse<PaymentResponse[]>>(`${this.baseUrl}/my-payments`);
+    }
+
+    /**
+     * Check if user can access a specific lesson
+     */
+    canAccessLesson(courseId: string, lessonIndex: number): Observable<ApiResponse<LessonAccessResponse>> {
+        return this.http.get<ApiResponse<LessonAccessResponse>>(
+            `${this.baseUrl}/can-access/${courseId}/lesson/${lessonIndex}`
+        );
+    }
+
+    /**
+     * Create VNPay payment URL (redirect flow)
+     */
+    createVnPayUrl(courseId: string, amount: number): Observable<ApiResponse<VnPayUrlResponse>> {
+        return this.http.post<ApiResponse<VnPayUrlResponse>>(`${this.baseUrl}/vnpay/create-url`, {
+            courseId,
+            amount
+        });
+    }
+
+    /**
+     * Get payment by transaction reference (for callback verification)
+     * SECURITY: Used by payment-callback to verify status from server,
+     * not from URL params which could be forged.
+     */
+    getPaymentByTxnRef(txnRef: string): Observable<ApiResponse<PaymentResponse>> {
+        return this.http.get<ApiResponse<PaymentResponse>>(`${this.baseUrl}/by-ref/${txnRef}`);
+    }
+
+    /**
+     * Create SePay QR payment — returns QR URL + bank transfer info
+     */
+    createSepayQr(courseId: string): Observable<ApiResponse<SepayQrData>> {
+        return this.http.post<ApiResponse<SepayQrData>>(`${this.baseUrl}/sepay/create-qr`, { courseId });
+    }
+
+    /**
+     * Poll SePay payment status by transaction ID
+     */
+    pollSepayStatus(txnId: string): Observable<ApiResponse<SepayPollResponse>> {
+        return this.http.get<ApiResponse<SepayPollResponse>>(`${this.baseUrl}/sepay/poll/${txnId}`);
+    }
+
+    /**
+     * Get payment methods currently available to learners.
+     */
+    getAvailablePaymentMethods(): Observable<ApiResponse<PaymentGatewayAvailabilityResponse>> {
+        return this.http.get<ApiResponse<PaymentGatewayAvailabilityResponse>>(`${this.baseUrl}/available-methods`);
+    }
+}
+
+export interface VnPayUrlResponse {
+    paymentUrl: string;
+    transactionId: string;
+}

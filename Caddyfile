@@ -1,0 +1,97 @@
+# =============================================================================
+# LMS Maritime - Caddy Reverse Proxy Configuration
+# Site address is controlled by LMS_SITE_ADDRESS.
+# Default is Auto-HTTPS for holilihu.online; review runtime may use HTTP by IP.
+# =============================================================================
+
+(edge_response_headers) {
+    header -Server
+    header -X-Powered-By
+    header -X-XSS-Protection
+
+    header {
+        >Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://accounts.google.com https://www.youtube.com https://*.ytimg.com; style-src 'self' 'unsafe-inline' https://accounts.google.com https://fonts.googleapis.com; img-src 'self' data: blob: https: https://ui-avatars.com https://*.ytimg.com; connect-src 'self' https://accounts.google.com https://lh3.googleusercontent.com https://ui-avatars.com https://fonts.googleapis.com https://fonts.gstatic.com https://wiii.holilihu.online https://cdn.holilihu.online https://media.holilihu.online https://*.r2.cloudflarestorage.com https://sandbox.vnpayment.vn https://pay.vnpay.vn https://qr.sepay.vn https://videodelivery.net https://www.youtube.com https://*.ytimg.com wss:; media-src 'self' data: blob: https:; font-src 'self' data: https://fonts.gstatic.com; frame-src 'self' blob: https://wiii.holilihu.online https://media.holilihu.online https://accounts.google.com https://www.youtube.com https://www.youtube-nocookie.com; worker-src 'self' blob:; frame-ancestors 'self'; object-src 'none'; base-uri 'self';"
+        >Reporting-Endpoints "csp-endpoint=\"https://holilihu.online/api/v3/security/csp-report\""
+        # Report-only mirrors the currently enforced inline-script posture.
+        # A static nonce creates noisy false positives without hardening runtime CSP.
+        >Content-Security-Policy-Report-Only "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'report-sample' https://accounts.google.com https://www.youtube.com https://www.youtube.com/iframe_api https://s.ytimg.com https://*.ytimg.com; style-src 'self' 'unsafe-inline' 'report-sample' https://accounts.google.com https://fonts.googleapis.com; style-src-elem 'self' 'unsafe-inline' 'report-sample' https://accounts.google.com https://fonts.googleapis.com; style-src-attr 'unsafe-inline'; img-src 'self' data: blob: https://holilihu.online https://cdn.holilihu.online https://media.holilihu.online https://ui-avatars.com https://*.ytimg.com https://i.ytimg.com https://img.youtube.com https://qr.sepay.vn https://accounts.google.com https://lh3.googleusercontent.com; connect-src 'self' https://accounts.google.com https://lh3.googleusercontent.com https://ui-avatars.com https://fonts.googleapis.com https://fonts.gstatic.com https://wiii.holilihu.online https://cdn.holilihu.online https://media.holilihu.online https://*.r2.cloudflarestorage.com https://qr.sepay.vn https://www.youtube.com https://*.ytimg.com wss:; media-src 'self' data: blob: https://cdn.holilihu.online https://media.holilihu.online https://*.r2.cloudflarestorage.com https://videodelivery.net; font-src 'self' data: https://fonts.gstatic.com; frame-src 'self' blob: https://wiii.holilihu.online https://media.holilihu.online https://accounts.google.com https://www.youtube.com https://www.youtube-nocookie.com; child-src 'self' blob: https://wiii.holilihu.online https://media.holilihu.online https://accounts.google.com https://www.youtube.com https://www.youtube-nocookie.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self' https://accounts.google.com; frame-ancestors 'self'; report-uri /api/v3/security/csp-report; report-to csp-endpoint;"
+        >X-Frame-Options "SAMEORIGIN"
+        >X-Content-Type-Options "nosniff"
+        >Cross-Origin-Opener-Policy "same-origin-allow-popups"
+        >Cross-Origin-Resource-Policy "same-site"
+        >X-Permitted-Cross-Domain-Policies "none"
+        >Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        >Referrer-Policy "strict-origin-when-cross-origin"
+        >Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+    }
+}
+
+{$LMS_SITE_ADDRESS:holilihu.online} {
+    @adaptivePlayback path /api/v3/video-assets/*/adaptive/*
+
+    # Defense-in-depth: never let hidden or repo metadata paths fall through to SSR.
+    @hiddenFiles path /.env /.env.* /.git/* /.svn/* /.hg/* /.DS_Store /Thumbs.db
+    handle @hiddenFiles {
+        import edge_response_headers
+        respond 404
+    }
+
+    handle @adaptivePlayback {
+        import edge_response_headers
+        reverse_proxy backend:8080 {
+            # No caching for adaptive playback responses.
+            # 1) Manifests + segments contain JWT-signed URLs that expire (60s-4h).
+            # 2) Previous setting `private, max-age=30` cached 5xx errors at the
+            #    browser layer, so users hit stale 504/403 for 30s after the
+            #    server-side fix had already deployed (incident 2026-04-30).
+            # Trade-off: lose minor browser cache hit rate (segments rarely
+            #    re-fetched anyway), gain immediate recovery from transient errors.
+            header_down Cache-Control "no-store, must-revalidate"
+            header_down -Pragma
+            header_down -Expires
+        }
+    }
+
+    # Backend API
+    handle /api/v3/api-docs* {
+        import edge_response_headers
+        respond 404
+    }
+
+    handle /api/* {
+        import edge_response_headers
+        reverse_proxy backend:8080
+    }
+
+    # Health check only (other actuator endpoints not exposed)
+    handle /actuator/health {
+        import edge_response_headers
+        reverse_proxy backend:8080
+    }
+    handle /actuator* {
+        import edge_response_headers
+        respond 404
+    }
+
+    # File uploads (LocalStorageService)
+    handle /uploads/* {
+        import edge_response_headers
+        reverse_proxy backend:8080
+    }
+
+    # Block Swagger/API docs in production (springdoc disabled, but defense-in-depth)
+    handle /swagger-ui* {
+        respond 404
+    }
+    handle /v3/api-docs* {
+        respond 404
+    }
+
+    # Frontend (Angular SPA) — catch-all
+    handle {
+        import edge_response_headers
+        reverse_proxy frontend:80
+    }
+    # Compression
+    encode gzip zstd
+}

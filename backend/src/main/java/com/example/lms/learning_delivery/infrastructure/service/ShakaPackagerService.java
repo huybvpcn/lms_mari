@@ -1,0 +1,208 @@
+package com.example.lms.learning_delivery.infrastructure.service;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
+import java.util.UUID;
+
+@Service
+@Slf4j
+public class ShakaPackagerService {
+
+    private static final int DEFAULT_SEGMENT_DURATION_SECONDS = 6;
+
+    @Value("${app.video.adaptive-segment-duration-seconds:6}")
+    private int segmentDurationSeconds;
+
+    public PackageOutput packageAdaptive(UUID assetId, List<PackagerInput> inputs) throws IOException, InterruptedException {
+        if (inputs == null || inputs.isEmpty()) {
+            throw new IOException("No renditions are available for adaptive packaging");
+        }
+
+        Path outputDir = Files.createTempDirectory("video-package-" + assetId + "-");
+        try {
+            Files.createDirectories(outputDir.resolve("hls"));
+            Files.createDirectories(outputDir.resolve("dash"));
+            Files.createDirectories(outputDir.resolve("segments"));
+
+            List<String> command = new ArrayList<>();
+            command.add("packager");
+
+            PackagerInput audioSource = inputs.stream()
+                    .filter(PackagerInput::hasAudio)
+                    .findFirst()
+                    .orElse(null);
+            if (audioSource != null) {
+                Files.createDirectories(outputDir.resolve("segments/audio"));
+                command.add(buildAudioArgument(audioSource));
+            }
+
+            for (PackagerInput input : inputs.stream()
+                    .sorted(Comparator.comparingInt(PackagerInput::height))
+                    .toList()) {
+                Files.createDirectories(outputDir.resolve("segments").resolve(slugify(input.profile())));
+                command.add(buildVideoArgument(input));
+            }
+
+            command.add("--segment_duration");
+            command.add(String.valueOf(resolveSegmentDurationSeconds()));
+            command.add("--hls_master_playlist_output");
+            command.add("hls/master.m3u8");
+            command.add("--mpd_output");
+            command.add("dash/manifest.mpd");
+            // Force static MPD for VOD content. Without this, Shaka Packager v3.4+
+            // emits `type="dynamic"` with `minimumUpdatePeriod` for live-profile MPDs
+            // even when content is finite. Players (Shaka, dash.js) then treat it as
+            // live: video.duration → Infinity, current time keeps advancing past
+            // EOF, and the watched-segments tracker sends Infinity → JSON null →
+            // backend `@Positive int` validation rejects with 400 (issue 2026-04-30).
+            command.add("--generate_static_live_mpd");
+
+            runCommand(command, outputDir);
+
+            List<PackagedFile> packagedFiles;
+            try (var stream = Files.walk(outputDir)) {
+                packagedFiles = stream
+                        .filter(Files::isRegularFile)
+                        .sorted()
+                        .map(path -> new PackagedFile(
+                                outputDir.relativize(path).toString().replace('\\', '/'),
+                                path
+                        ))
+                        .toList();
+            }
+
+            // Defensive logging — trước fail-fast ta dump toàn bộ tree để biết Shaka thực sự ghi gì.
+            log.info("[VideoAsset] Shaka local output tree ({} files): {}",
+                    packagedFiles.size(),
+                    packagedFiles.stream().map(PackagedFile::relativePath).toList());
+
+            // Validate: every declared video input MUST have produced segments + init.mp4.
+            // Shaka Packager has been observed (2026-04-30) to exit 0 yet silently
+            // skip writing segments cho 1+ quality tier. Without strict validation
+            // pipeline marks adaptive_packaging_status=READY → student playback fails.
+            for (PackagerInput input : inputs) {
+                String profileSlug = slugify(input.profile());
+                Path segmentDir = outputDir.resolve("segments").resolve(profileSlug);
+
+                long segmentCount;
+                long initCount;
+                try (var stream = Files.walk(segmentDir)) {
+                    var files = stream.filter(Files::isRegularFile).toList();
+                    segmentCount = files.stream().filter(p -> p.toString().endsWith(".m4s")).count();
+                    initCount = files.stream().filter(p -> p.toString().endsWith("init.mp4")).count();
+                }
+                if (segmentCount == 0 || initCount == 0) {
+                    throw new IOException("Shaka Packager incomplete output for profile '"
+                            + input.profile() + "': segments=" + segmentCount + ", init=" + initCount
+                            + " (input=" + input.sourcePath().getFileName()
+                            + "). Tree: " + packagedFiles.stream().map(PackagedFile::relativePath).toList());
+                }
+            }
+
+            return new PackageOutput(
+                    outputDir,
+                    "hls/master.m3u8",
+                    "dash/manifest.mpd",
+                    packagedFiles
+            );
+        } catch (IOException | InterruptedException ex) {
+            deleteDirectoryQuietly(outputDir);
+            throw ex;
+        }
+    }
+
+    private String buildAudioArgument(PackagerInput input) {
+        return "in=" + input.sourcePath().toAbsolutePath()
+                + ",stream=audio"
+                + ",init_segment=segments/audio/init.mp4"
+                + ",segment_template=segments/audio/$Number$.m4s"
+                + ",playlist_name=hls/audio.m3u8"
+                + ",hls_group_id=audio"
+                + ",hls_name=Default";
+    }
+
+    private String buildVideoArgument(PackagerInput input) {
+        String profileSlug = slugify(input.profile());
+        return "in=" + input.sourcePath().toAbsolutePath()
+                + ",stream=video"
+                + ",init_segment=segments/" + profileSlug + "/init.mp4"
+                + ",segment_template=segments/" + profileSlug + "/$Number$.m4s"
+                + ",playlist_name=hls/" + profileSlug + ".m3u8"
+                + ",iframe_playlist_name=hls/" + profileSlug + "-iframe.m3u8"
+                + ",hls_name=" + input.displayLabel();
+    }
+
+    private static final long PROCESS_TIMEOUT_MINUTES = 5;
+
+    private void runCommand(List<String> command, Path workingDirectory) throws IOException, InterruptedException {
+        log.info("[VideoAsset] Running Shaka Packager: {}", String.join(" ", command));
+        Process process = new ProcessBuilder(command)
+                .directory(workingDirectory.toFile())
+                .redirectErrorStream(true)
+                .start();
+
+        String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        boolean finished = process.waitFor(PROCESS_TIMEOUT_MINUTES, java.util.concurrent.TimeUnit.MINUTES);
+        if (!finished) {
+            process.destroyForcibly();
+            throw new IOException("Shaka Packager timed out after " + PROCESS_TIMEOUT_MINUTES + " minutes\nOutput:\n" + output);
+        }
+        int exitCode = process.exitValue();
+        // Always log packager output — even on exit 0. Shaka may print warnings about
+        // dropped streams (issue 2026-04-30: silent SAVER/STANDARD segment skip leading
+        // to 404 on student playback). Without this log we have zero visibility.
+        log.info("[VideoAsset] Shaka Packager exit={}, output:\n{}", exitCode, output);
+        if (exitCode != 0) {
+            throw new IOException("Shaka Packager failed (" + exitCode + "): " + output);
+        }
+    }
+
+    int resolveSegmentDurationSeconds() {
+        return segmentDurationSeconds >= 2 ? segmentDurationSeconds : DEFAULT_SEGMENT_DURATION_SECONDS;
+    }
+
+    private void deleteDirectoryQuietly(Path directory) {
+        if (directory == null || !Files.exists(directory)) {
+            return;
+        }
+        try (var walk = Files.walk(directory)) {
+            walk.sorted(Comparator.reverseOrder()).forEach(path -> {
+                try { Files.deleteIfExists(path); } catch (IOException ignored) {}
+            });
+        } catch (IOException ignored) {}
+    }
+
+    private String slugify(String value) {
+        return value == null ? "unknown" : value.trim().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-");
+    }
+
+    public record PackagerInput(
+            String profile,
+            String displayLabel,
+            int height,
+            Path sourcePath,
+            boolean hasAudio
+    ) {}
+
+    public record PackagedFile(
+            String relativePath,
+            Path file
+    ) {}
+
+    public record PackageOutput(
+            Path outputDirectory,
+            String hlsManifestRelativePath,
+            String dashManifestRelativePath,
+            List<PackagedFile> files
+    ) {}
+}

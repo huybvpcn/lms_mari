@@ -1,0 +1,152 @@
+<div class="analytics-page">
+  <div class="header-bar">
+    <div class="header-inner">
+      <div class="header-text">
+        <h1>Phân tích học tập</h1>
+      </div>
+      <div class="header-actions">
+        <button class="export-btn" (click)="printReport()" [disabled]="isLoading()">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+          <span class="btn-text">In báo cáo</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="analytics-main">
+    @if (isLoading()) {
+      <!-- Skeleton: ① Metrics strip -->
+      <div class="skeleton-strip animate-pulse">
+        @for (_ of [1,2,3,4]; track $index) {
+          <div class="skeleton-cell">
+            <div class="sk" style="height:24px;width:48px;margin-bottom:6px"></div>
+            <div class="sk-light" style="height:12px;width:72px"></div>
+          </div>
+        }
+      </div>
+      <!-- Skeleton: ② Courses + Chart (cạnh nhau) -->
+      <div class="content-grid">
+        <div class="skeleton-card animate-pulse" style="margin-bottom:0">
+          <div style="display:flex;justify-content:space-between;margin-bottom:16px">
+            <div class="sk" style="height:15px;width:130px"></div>
+            <div class="sk-light" style="height:12px;width:50px"></div>
+          </div>
+          @for (_ of [1,2,3,4]; track $index) {
+            <div style="display:flex;align-items:center;gap:12px;padding:10px 0">
+              <div class="sk-light" style="width:44px;height:44px;border-radius:6px;flex-shrink:0"></div>
+              <div style="flex:1"><div class="sk" style="height:13px;width:60%;margin-bottom:8px"></div><div class="sk-light" style="height:6px;width:100%;border-radius:3px"></div></div>
+            </div>
+          }
+        </div>
+        <div class="skeleton-card animate-pulse" style="margin-bottom:0">
+          <div class="sk" style="height:15px;width:160px;margin-bottom:12px"></div>
+          <div class="sk-light" style="height:200px;border-radius:6px"></div>
+        </div>
+      </div>
+    } @else {
+
+      <!-- ① Tổng quan — màu trung tính, không gây alarm (Coursera pattern) -->
+      <div class="metrics-strip">
+        <div class="metric-cell">
+          <p class="metric-value">{{ fmtScore(analytics().totalStudyTimeHours) }}h</p>
+          <p class="metric-label">Giờ học</p>
+        </div>
+        <div class="metric-cell">
+          <p class="metric-value">{{ analytics().coursesCompleted }}<span class="metric-denominator">/ {{ totalCourses() }}</span></p>
+          <p class="metric-label">Khóa hoàn thành</p>
+        </div>
+        <div class="metric-cell">
+          <p class="metric-value">{{ fmtScore(analytics().averageScore) }}%</p>
+          <p class="metric-label">Điểm TB</p>
+        </div>
+        <div class="metric-cell">
+          <p class="metric-value">{{ analytics().certificatesEarned }}</p>
+          <p class="metric-label">Chứng chỉ</p>
+        </div>
+      </div>
+
+      <!-- ② Tiến độ khóa học + Kết quả quiz (cạnh nhau) -->
+      <div class="content-grid">
+        <!-- Tiến độ khóa học -->
+        <div class="courses-card">
+          <div class="section-header">
+            <h2 class="section-title">Tiến độ khóa học</h2>
+            @if (activeCourses().length > 0) {
+              <span class="section-count">{{ activeCourses().length }} khóa</span>
+            }
+          </div>
+          @if (activeCourses().length > 0) {
+            <ul class="course-list-scroll">
+              @for (course of activeCourses(); track course.id) {
+                <li class="course-item">
+                  <div class="course-thumb">
+                    @if (course.thumbnailUrl) { <img [src]="course.thumbnailUrl" [alt]="course.title"/> }
+                    @else { <div class="course-thumb-placeholder"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0z"/></svg></div> }
+                  </div>
+                  <div class="course-info">
+                    <div class="course-title-row">
+                      <a [routerLink]="['/student/courses', course.id]" class="course-name">{{ course.title }}</a>
+                      <span class="course-percent" [style.color]="scoreColor(course.progress ?? 0)">{{ course.progress ?? 0 }}%</span>
+                    </div>
+                    <div class="course-progress-bar"><div class="course-progress-fill" [class.high]="(course.progress ?? 0) >= 80" [style.width.%]="course.progress ?? 0"></div></div>
+                    <div class="course-meta">{{ course.completedLessons ?? 0 }}/{{ course.totalLessons ?? 0 }} bài học</div>
+                  </div>
+                </li>
+              }
+            </ul>
+          } @else {
+            <div class="chart-empty"><div>
+              <p class="empty-title">Chưa đăng ký khóa học nào</p>
+              <p class="empty-sub">Khám phá các khóa học hàng hải để bắt đầu</p>
+              <a routerLink="/student/browse" class="empty-cta">Khám phá khóa học</a>
+            </div></div>
+          }
+        </div>
+
+        <!-- Kết quả quiz -->
+        <div class="chart-card">
+          <h2 class="section-title" style="margin-bottom:12px">Kết quả quiz gần đây</h2>
+          @if (trendPoints().length >= 2) {
+            <div class="chart-scroll">
+            <svg [attr.viewBox]="'0 0 ' + svgW + ' ' + svgH" width="100%" preserveAspectRatio="xMidYMid meet">
+              <defs><linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#0056D2" stop-opacity="0.12"/><stop offset="100%" stop-color="#0056D2" stop-opacity="0.01"/></linearGradient></defs>
+              @for (label of trendYLabels(); track label.value) {
+                <line [attr.x1]="38" [attr.x2]="svgW - 12" [attr.y1]="label.y" [attr.y2]="label.y" stroke="#F3F4F6" stroke-width="1"/>
+                <text [attr.x]="34" [attr.y]="label.y + 3" text-anchor="end" font-size="10" fill="#9CA3AF">{{ label.value }}%</text>
+              }
+              <line [attr.x1]="38" [attr.x2]="svgW - 12" [attr.y1]="refLine50Y()" [attr.y2]="refLine50Y()" stroke="#ca8a04" stroke-width="1" stroke-dasharray="4 3" opacity="0.4"/>
+              <text [attr.x]="svgW - 10" [attr.y]="refLine50Y() - 3" text-anchor="end" font-size="9" fill="#ca8a04" opacity="0.7">Đạt</text>
+              <line [attr.x1]="38" [attr.x2]="svgW - 12" [attr.y1]="refLine80Y()" [attr.y2]="refLine80Y()" stroke="#059669" stroke-width="1" stroke-dasharray="4 3" opacity="0.4"/>
+              <text [attr.x]="svgW - 10" [attr.y]="refLine80Y() - 3" text-anchor="end" font-size="9" fill="#059669" opacity="0.7">Giỏi</text>
+              <path [attr.d]="trendAreaPath()" fill="url(#areaGrad)"/>
+              <path [attr.d]="trendLinePath()" fill="none" stroke="#0056D2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              @for (pt of trendPoints(); track $index) {
+                <circle [attr.cx]="pt.x" [attr.cy]="pt.y" r="3.5" fill="white" [attr.stroke]="scoreDotColor(pt.score)" stroke-width="2"/>
+                <circle [attr.cx]="pt.x" [attr.cy]="pt.y" r="12" fill="transparent" style="cursor:pointer"><title>{{ fmtDateFull(pt.date) }} — {{ fmtScore(pt.score) }}%</title></circle>
+              }
+              @for (pt of trendPoints(); let i = $index; let last = $last; let first = $first; track i) {
+                @if (first || last || i % trendLabelStep() === 0) { <text [attr.x]="pt.x" [attr.y]="svgH - 4" text-anchor="middle" font-size="10" fill="#9CA3AF">{{ fmtDateVi(pt.date) }}</text> }
+              }
+            </svg>
+            </div>
+          } @else {
+            <div class="chart-empty"><div>
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width:40px;height:40px;color:#D1D5DB;margin:0 auto 8px"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"/></svg>
+              <p class="empty-title">Chưa có kết quả quiz</p>
+              <p class="empty-sub">Hoàn thành ít nhất 2 bài quiz để theo dõi tiến bộ</p>
+            </div></div>
+          }
+          <!-- Tổng kết (footer trong card — cùng ngữ cảnh với biểu đồ) -->
+          <div class="chart-footer">
+            <span class="footer-stat">{{ analytics().totalQuizAttempts }} lượt quiz</span>
+            <span class="footer-dot">&middot;</span>
+            <span class="footer-stat">{{ analytics().totalAssignmentsSubmitted }} bài tập</span>
+            <span class="footer-dot">&middot;</span>
+            <span class="footer-stat">{{ fmtScore(analytics().averageCompletionPercent) }}% tiến độ</span>
+          </div>
+        </div>
+      </div>
+
+    }
+  </div>
+</div>

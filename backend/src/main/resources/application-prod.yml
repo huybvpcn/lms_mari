@@ -1,0 +1,164 @@
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  # Database
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/lms}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    hikari:
+      maximum-pool-size: ${HIKARI_MAX_POOL:20}
+      minimum-idle: ${HIKARI_MIN_IDLE:10}
+      connection-timeout: 5000
+      idle-timeout: 300000
+      max-lifetime: 1200000
+
+  # JPA - Production
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: false
+        show_sql: false
+        default_batch_fetch_size: 16
+        jdbc:
+          batch_size: 25
+        order_inserts: true
+        order_updates: true
+
+  # Flyway - ENABLED in production
+  # V1 has complete schema. Baseline at V53 = skip V1-V53.
+  # New migrations (V54+) will run automatically.
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 53
+    locations: classpath:db/migration
+    validate-on-migrate: false
+
+  # File upload limits
+  servlet:
+    multipart:
+      max-file-size: 5GB
+      max-request-size: 5GB
+
+server:
+  port: 8080
+  # Trust Caddy reverse proxy headers (X-Forwarded-For, X-Forwarded-Proto)
+  forward-headers-strategy: NATIVE
+  # Production: Graceful shutdown
+  shutdown: graceful
+  tomcat:
+    connection-timeout: 5000
+    max-connections: 200
+    accept-count: 100
+
+# App Configuration
+app:
+  cors:
+    allowed-origins: ${APP_CORS_ORIGINS:https://holilihu.online}
+  jwt:
+    secret: ${APP_JWT_SECRET}
+    expiration: ${APP_JWT_EXPIRATION:86400000}
+    refresh-expiration: ${APP_JWT_REFRESH_EXPIRATION:604800000}
+  storage:
+    local:
+      base-path: uploads
+      base-url: ${APP_BASE_URL:https://holilihu.online}/uploads
+  email:
+    from: "${EMAIL_FROM:LMS Maritime <noreply@holilihu.online>}"
+    base-url: "${APP_BASE_URL:https://holilihu.online}"
+  resend:
+    api-key: "${RESEND_API_KEY:}"
+  vnpay:
+    tmn-code: "${VNPAY_TMN_CODE:}"
+    hash-secret: "${VNPAY_HASH_SECRET:}"
+    pay-url: "${VNPAY_PAY_URL:https://pay.vnpay.vn/vpcpay.html}"
+    return-url: "${APP_BASE_URL:https://holilihu.online}/api/v3/payments/vnpay-return"
+    ipn-url: "${APP_BASE_URL:https://holilihu.online}/api/v3/payments/vnpay-ipn"
+    expire-minutes: 15
+  sepay:
+    enabled: "${SEPAY_ENABLED:false}"
+    bank-code: "${SEPAY_BANK_CODE:}"
+    account-number: "${SEPAY_ACCOUNT_NUMBER:}"
+    account-name: "${SEPAY_ACCOUNT_NAME:LMS MARITIME}"
+    webhook-api-key: "${SEPAY_WEBHOOK_API_KEY:}"
+    template-code: "${SEPAY_TEMPLATE_CODE:compact2}"
+  video:
+    ingest:
+      enabled: ${VIDEO_INGEST_ENABLED:true}
+    playback-token-expiry-seconds: ${VIDEO_PLAYBACK_TOKEN_EXPIRY_SECONDS:14400}
+    segment-presign-ttl-seconds: ${VIDEO_SEGMENT_PRESIGN_TTL_SECONDS:120}
+    media-domain: ${VIDEO_MEDIA_DOMAIN:}
+    edge-auth-mode: ${VIDEO_EDGE_AUTH_MODE:disabled}
+    edge-hmac-secret: ${VIDEO_EDGE_HMAC_SECRET:}
+    edge-token-expiry-seconds: ${VIDEO_EDGE_TOKEN_EXPIRY_SECONDS:300}
+    manifest-cache-seconds: ${VIDEO_MANIFEST_CACHE_SECONDS:60}
+    object-redirect-cache-seconds: ${VIDEO_OBJECT_REDIRECT_CACHE_SECONDS:30}
+    package-upload-concurrency: ${VIDEO_PACKAGE_UPLOAD_CONCURRENCY:6}
+    adaptive-segment-duration-seconds: ${VIDEO_ADAPTIVE_SEGMENT_DURATION_SECONDS:6}
+    ffmpeg-preset: ${VIDEO_FFMPEG_PRESET:veryfast}
+    offline-profiles: ${VIDEO_OFFLINE_PROFILES:SAVER,STANDARD,HIGH}
+    adaptive-profiles: ${VIDEO_ADAPTIVE_PROFILES:SAVER,STANDARD,HIGH}
+    retain-source-after-ready: ${VIDEO_RETAIN_SOURCE_AFTER_READY:true}
+
+# R2 Storage
+# - master assets + offline downloadable files
+# - adaptive manifests/segments for learner playback
+cloudflare:
+  r2:
+    enabled: ${CLOUDFLARE_R2_ENABLED:false}
+    account-id: ${CLOUDFLARE_R2_ACCOUNT_ID:}
+    access-key: ${CLOUDFLARE_R2_ACCESS_KEY:}
+    secret-key: ${CLOUDFLARE_R2_SECRET_KEY:}
+    endpoint: ${CLOUDFLARE_R2_ENDPOINT:}
+    region: ${CLOUDFLARE_R2_REGION:auto}
+    path-style-access: ${CLOUDFLARE_R2_PATH_STYLE_ACCESS:true}
+    bucket: ${CLOUDFLARE_R2_BUCKET:lms-cdn}
+    video-bucket: ${CLOUDFLARE_R2_VIDEO_BUCKET:lms-storage}
+    simulation-bucket: ${CLOUDFLARE_R2_SIMULATION_BUCKET:lms-storage}
+    simulation-public-url: ${CLOUDFLARE_R2_SIMULATION_PUBLIC_URL:/simulations}
+    simulation-prefix: ${CLOUDFLARE_R2_SIMULATION_PREFIX:simulations}
+    public-url: ${CLOUDFLARE_R2_PUBLIC_URL:}
+  # Stream remains optional/legacy only. Production video playback targets R2 + Shaka.
+  stream:
+    enabled: ${CLOUDFLARE_STREAM_ENABLED:false}
+    account-id: ${CLOUDFLARE_ACCOUNT_ID:}
+    api-token: ${CLOUDFLARE_STREAM_API_TOKEN:}
+    key-id: ${CLOUDFLARE_STREAM_KEY_ID:}
+    private-key: ${CLOUDFLARE_STREAM_PRIVATE_KEY:}
+    token-expiry-seconds: ${CLOUDFLARE_STREAM_TOKEN_EXPIRY:14400}
+
+# Actuator - Production endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized
+  health:
+    mail:
+      enabled: false
+
+# Logging - Production
+logging:
+  level:
+    root: WARN
+    com.example.lms: INFO
+    org.hibernate.SQL: WARN
+    org.hibernate.orm.jdbc.bind: WARN
+    org.springframework.orm.jpa: WARN
+    org.springframework.transaction: WARN
+    org.springframework.security: WARN

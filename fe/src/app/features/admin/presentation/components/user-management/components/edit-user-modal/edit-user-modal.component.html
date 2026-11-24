@@ -1,0 +1,44 @@
+<app-dialog
+  [open]="state.isEditModalOpen()"
+  title="Chỉnh sửa người dùng"
+  size="md"
+  (close)="state.closeEditModal()">
+  <div class="form-field">
+    <label class="form-label" for="edit-user-name">Tên</label>
+    <input id="edit-user-name"
+           type="text"
+           [ngModel]="state.editingUserName()"
+           (ngModelChange)="state.editingUserName.set($event)"
+           class="form-input">
+  </div>
+
+  <div class="form-field">
+    <label class="form-label" for="edit-user-email">Email</label>
+    <input id="edit-user-email"
+           type="email"
+           [ngModel]="state.editingUserEmail()"
+           (ngModelChange)="state.editingUserEmail.set($event)"
+           class="form-input">
+  </div>
+
+  <div class="form-field">
+    <label class="form-label" for="edit-user-role">Vai trò</label>
+    <select id="edit-user-role"
+            [ngModel]="state.editingUserRole()"
+            (ngModelChange)="state.editingUserRole.set($event)"
+            class="form-select">
+      @for (roleOpt of state.ROLE_OPTIONS; track roleOpt.value) {
+        <option [value]="roleOpt.value">{{ roleOpt.label }}</option>
+      }
+    </select>
+  </div>
+
+  <div dialogFooter>
+    <button (click)="state.closeEditModal()" type="button" class="btn-secondary">
+      Hủy
+    </button>
+    <button (click)="state.saveUserEdit()" type="button" class="btn-primary">
+      Lưu thay đổi
+    </button>
+  </div>
+</app-dialog>

@@ -1,0 +1,212 @@
+# =============================================================================
+# Production Environment - Override Configuration
+# Usage: docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml up -d
+# =============================================================================
+
+x-backend-runtime-env: &backend-runtime-env
+  SPRING_PROFILES_ACTIVE: prod
+  LOGGING_LEVEL_ROOT: WARN
+  LOGGING_LEVEL_COM_EXAMPLE_LMS: INFO
+  SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-lms}
+  SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-lms}
+  SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-lms}
+  APP_JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env.prod}
+  APP_JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
+  APP_JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-604800000}
+  CLOUDFLARE_R2_ENABLED: ${CLOUDFLARE_R2_ENABLED:-false}
+  CLOUDFLARE_R2_ACCOUNT_ID: ${CLOUDFLARE_R2_ACCOUNT_ID:-}
+  CLOUDFLARE_R2_ACCESS_KEY: ${CLOUDFLARE_R2_ACCESS_KEY:-}
+  CLOUDFLARE_R2_SECRET_KEY: ${CLOUDFLARE_R2_SECRET_KEY:-}
+  CLOUDFLARE_R2_BUCKET: ${CLOUDFLARE_R2_BUCKET:-lms-cdn}
+  CLOUDFLARE_R2_VIDEO_BUCKET: ${CLOUDFLARE_R2_VIDEO_BUCKET:-lms-storage}
+  CLOUDFLARE_R2_SIMULATION_BUCKET: ${CLOUDFLARE_R2_SIMULATION_BUCKET:-lms-storage}
+  CLOUDFLARE_R2_SIMULATION_PUBLIC_URL: ${CLOUDFLARE_R2_SIMULATION_PUBLIC_URL:-/simulations}
+  CLOUDFLARE_R2_SIMULATION_PREFIX: ${CLOUDFLARE_R2_SIMULATION_PREFIX:-simulations}
+  CLOUDFLARE_R2_PUBLIC_URL: ${CLOUDFLARE_R2_PUBLIC_URL:-}
+  VIDEO_INGEST_ENABLED: ${VIDEO_INGEST_ENABLED:-true}
+  VIDEO_PLAYBACK_TOKEN_EXPIRY_SECONDS: ${VIDEO_PLAYBACK_TOKEN_EXPIRY_SECONDS:-14400}
+  VIDEO_SEGMENT_PRESIGN_TTL_SECONDS: ${VIDEO_SEGMENT_PRESIGN_TTL_SECONDS:-120}
+  VIDEO_MEDIA_DOMAIN: ${VIDEO_MEDIA_DOMAIN:-}
+  VIDEO_EDGE_AUTH_MODE: ${VIDEO_EDGE_AUTH_MODE:-disabled}
+  VIDEO_EDGE_HMAC_SECRET: ${VIDEO_EDGE_HMAC_SECRET:-}
+  VIDEO_EDGE_TOKEN_EXPIRY_SECONDS: ${VIDEO_EDGE_TOKEN_EXPIRY_SECONDS:-300}
+  VIDEO_MANIFEST_CACHE_SECONDS: ${VIDEO_MANIFEST_CACHE_SECONDS:-60}
+  VIDEO_OBJECT_REDIRECT_CACHE_SECONDS: ${VIDEO_OBJECT_REDIRECT_CACHE_SECONDS:-30}
+  VIDEO_PACKAGE_UPLOAD_CONCURRENCY: ${VIDEO_PACKAGE_UPLOAD_CONCURRENCY:-6}
+  VIDEO_ADAPTIVE_SEGMENT_DURATION_SECONDS: ${VIDEO_ADAPTIVE_SEGMENT_DURATION_SECONDS:-6}
+  VIDEO_FFMPEG_PRESET: ${VIDEO_FFMPEG_PRESET:-veryfast}
+  CLOUDFLARE_STREAM_ENABLED: ${CLOUDFLARE_STREAM_ENABLED:-false}
+  CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
+  CLOUDFLARE_STREAM_API_TOKEN: ${CLOUDFLARE_STREAM_API_TOKEN:-}
+  CLOUDFLARE_STREAM_KEY_ID: ${CLOUDFLARE_STREAM_KEY_ID:-}
+  CLOUDFLARE_STREAM_PRIVATE_KEY: ${CLOUDFLARE_STREAM_PRIVATE_KEY:-}
+  CLOUDFLARE_STREAM_TOKEN_EXPIRY: ${CLOUDFLARE_STREAM_TOKEN_EXPIRY:-14400}
+  APP_BASE_URL: ${APP_BASE_URL:-https://holilihu.online}
+  APP_CORS_ORIGINS: ${APP_CORS_ORIGINS:-https://holilihu.online}
+  GOOGLE_AUTH_ENABLED: ${GOOGLE_AUTH_ENABLED:-false}
+  GOOGLE_WEB_CLIENT_ID: ${GOOGLE_WEB_CLIENT_ID:-}
+  GOOGLE_OAUTH_REDIRECT_FLOW_ENABLED: ${GOOGLE_OAUTH_REDIRECT_FLOW_ENABLED:-false}
+  GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+  GOOGLE_OAUTH_REDIRECT_URI: ${GOOGLE_OAUTH_REDIRECT_URI:-}
+  GOOGLE_OAUTH_FRONTEND_CALLBACK: ${GOOGLE_OAUTH_FRONTEND_CALLBACK:-}
+  AI_SERVICE_URL: ${AI_SERVICE_URL:-https://wiii.holilihu.online}
+  AI_SERVICE_API_KEY: ${AI_SERVICE_API_KEY:-}
+  WIII_WEBHOOK_URL: ${WIII_WEBHOOK_URL:-}
+  WIII_WEBHOOK_SECRET: ${WIII_WEBHOOK_SECRET:-}
+  WIII_WEBHOOK_ENABLED: ${WIII_WEBHOOK_ENABLED:-false}
+  WIII_SERVICE_TOKEN: ${WIII_SERVICE_TOKEN:-}
+  WIII_TOKEN_EXCHANGE_URL: ${WIII_TOKEN_EXCHANGE_URL:-}
+  SPRING_MAIL_HOST: ${MAIL_HOST:-}
+  SPRING_MAIL_PORT: ${MAIL_PORT:-587}
+  SPRING_MAIL_USERNAME: ${MAIL_USERNAME:-}
+  SPRING_MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+  RESEND_API_KEY: ${RESEND_API_KEY:-}
+  EMAIL_FROM: ${EMAIL_FROM:-LMS Maritime <onboarding@resend.dev>}
+  VNPAY_TMN_CODE: ${VNPAY_TMN_CODE:-}
+  VNPAY_HASH_SECRET: ${VNPAY_HASH_SECRET:-}
+  VNPAY_PAY_URL: ${VNPAY_PAY_URL:-}
+  SEPAY_ENABLED: ${SEPAY_ENABLED:-false}
+  SEPAY_BANK_CODE: ${SEPAY_BANK_CODE:-}
+  SEPAY_ACCOUNT_NUMBER: ${SEPAY_ACCOUNT_NUMBER:-}
+  SEPAY_ACCOUNT_NAME: ${SEPAY_ACCOUNT_NAME:-}
+  SEPAY_WEBHOOK_API_KEY: ${SEPAY_WEBHOOK_API_KEY:-}
+  SEPAY_TEMPLATE_CODE: ${SEPAY_TEMPLATE_CODE:-compact2}
+  GOTENBERG_URL: ${GOTENBERG_URL:-http://gotenberg:3000}
+  HIKARI_MAX_POOL: ${HIKARI_MAX_POOL:-30}
+  HIKARI_MIN_IDLE: ${HIKARI_MIN_IDLE:-15}
+  JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
+
+services:
+  db:
+    # No port exposure in production - internal network only
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
+  backend:
+    image: ghcr.io/linhlinhlin/lms-backend:${IMAGE_TAG:-latest}
+    # NO ports exposed - Caddy proxies internally via lms-frontend network
+    restart: always
+    environment:
+      <<: *backend-runtime-env
+    cpus: "${BACKEND_CPU_LIMIT:-1.5}"
+    mem_limit: "${BACKEND_MEMORY_LIMIT:-1536M}"
+    mem_reservation: "${BACKEND_MEMORY_RESERVATION:-768M}"
+    deploy:
+      resources:
+        limits:
+          cpus: "${BACKEND_CPU_LIMIT:-1.5}"
+          memory: "${BACKEND_MEMORY_LIMIT:-1536M}"
+        reservations:
+          cpus: "${BACKEND_CPU_RESERVATION:-0.5}"
+          memory: "${BACKEND_MEMORY_RESERVATION:-768M}"
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+
+  video-worker:
+    image: ghcr.io/linhlinhlin/lms-backend:${IMAGE_TAG:-latest}
+    profiles:
+      - video-worker
+    init: true
+    restart: always
+    environment:
+      <<: *backend-runtime-env
+    volumes:
+      - lms-uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - lms-backend
+      - lms-frontend
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    security_opt:
+      - no-new-privileges:true
+    cpus: "${VIDEO_WORKER_CPU_LIMIT:-1.5}"
+    mem_limit: "${VIDEO_WORKER_MEMORY_LIMIT:-1536M}"
+    mem_reservation: "${VIDEO_WORKER_MEMORY_RESERVATION:-768M}"
+    deploy:
+      resources:
+        limits:
+          cpus: "${VIDEO_WORKER_CPU_LIMIT:-1.5}"
+          memory: "${VIDEO_WORKER_MEMORY_LIMIT:-1536M}"
+        reservations:
+          cpus: "${VIDEO_WORKER_CPU_RESERVATION:-0.5}"
+          memory: "${VIDEO_WORKER_MEMORY_RESERVATION:-768M}"
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+
+  frontend:
+    image: ghcr.io/linhlinhlin/lms-frontend:${IMAGE_TAG:-latest}
+    # NO ports exposed - Caddy proxies internally
+    # Node.js SSR (~80-150MB) + nginx (~10MB) = ~200MB typical
+    restart: always
+    environment:
+      NG_ALLOWED_HOSTS: "holilihu.online,localhost,34.87.45.168"
+    cpus: "${FRONTEND_CPU_LIMIT:-0.5}"
+    mem_limit: "${FRONTEND_MEMORY_LIMIT:-384M}"
+    deploy:
+      resources:
+        limits:
+          cpus: "${FRONTEND_CPU_LIMIT:-0.5}"
+          memory: "${FRONTEND_MEMORY_LIMIT:-384M}"
+
+  # ===== Caddy Reverse Proxy (Auto-HTTPS) =====
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    environment:
+      LMS_SITE_ADDRESS: ${LMS_SITE_ADDRESS:-holilihu.online}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "${CADDY_CPU_LIMIT:-0.25}"
+          memory: "${CADDY_MEMORY_LIMIT:-128M}"
+    networks:
+      - lms-frontend
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:2019/config/ >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  caddy_data:
+    name: caddy_data
+  caddy_config:
+    name: caddy_config

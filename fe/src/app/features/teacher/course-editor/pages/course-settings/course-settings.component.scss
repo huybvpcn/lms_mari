@@ -1,0 +1,126 @@
+@import '../course-info/editor-shared';
+
+:host {
+  display: block;
+  min-height: 100%;
+}
+
+.course-settings-page {
+  min-height: 100%;
+  padding: 1.25rem;
+}
+
+/* ── Single-column layout ── */
+.settings-single-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+/* ── Toggle row (offline download, etc.) ── */
+.settings-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.settings-toggle-row__label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: rgb(15 23 42);
+  margin: 0;
+}
+
+.settings-toggle-row__hint {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: rgb(100 116 139);
+}
+
+/* ── Toggle switch (accessible) ── */
+.settings-toggle {
+  position: relative;
+  display: inline-flex;
+  height: 1.5rem;
+  width: 2.75rem;
+  flex-shrink: 0;
+  align-items: center;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background: rgb(203 213 225);
+  cursor: pointer;
+  transition: background-color 200ms ease;
+}
+
+.settings-toggle:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 86, 210, 0.15);
+}
+
+.settings-toggle--on {
+  background: rgb(0 86 210);
+}
+
+.settings-toggle__knob {
+  display: inline-block;
+  height: 1.25rem;
+  width: 1.25rem;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: transform 200ms ease;
+  transform: translateX(0);
+}
+
+.settings-toggle__knob--on {
+  transform: translateX(1.25rem);
+}
+
+/* ── Save row ── */
+.settings-save-row {
+  display: flex;
+  justify-content: flex-end;
+  padding-bottom: 1rem;
+}
+
+/* ── Danger zone ── */
+.settings-danger-card {
+  border-color: rgb(254 202 202) !important;
+}
+
+.settings-danger-card__header {
+  background: rgb(254 242 242) !important;
+  border-bottom-color: rgb(254 202 202) !important;
+}
+
+.settings-danger-card__warning {
+  font-size: 0.75rem;
+  color: rgba(185, 28, 28, 0.7);
+  margin-bottom: 0.75rem;
+}
+
+.settings-danger-card__button {
+  width: 100%;
+  height: 2.25rem;
+  border: 1px solid rgb(252 165 165);
+  border-radius: var(--editor-control-radius);
+  background: #fff;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: rgb(220 38 38);
+  cursor: pointer;
+  transition: background-color 160ms ease;
+}
+
+.settings-danger-card__button:hover {
+  background: rgb(254 226 226);
+}
+
+.settings-danger-card__button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: #fff;
+}

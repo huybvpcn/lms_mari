@@ -1,0 +1,286 @@
+@if (isLoading()) {
+  <!-- ===== SKELETON ===== -->
+  <div class="dashboard-page">
+    <div class="header-bar">
+      <div class="header-inner">
+        <div class="sk animate-pulse" style="height:24px;width:280px"></div>
+      </div>
+    </div>
+    <div class="dashboard-main">
+      <!-- Metrics strip skeleton -->
+      <div class="skeleton-strip animate-pulse">
+        @for (_ of [1,2,3,4]; track $index) {
+          <div class="skeleton-cell">
+            <div class="sk" style="height:24px;width:80px;margin-bottom:6px"></div>
+            <div class="sk-light" style="height:12px;width:100px"></div>
+          </div>
+        }
+      </div>
+      <!-- Summary + table skeleton -->
+      <div class="content-grid grid-2-1">
+        <div class="skeleton-card animate-pulse" style="min-height:280px">
+          <div class="sk" style="height:16px;width:160px;margin-bottom:16px"></div>
+          @for (_ of [1,2,3,4]; track $index) {
+            <div style="display:flex;align-items:center;gap:12px;padding:10px 0">
+              <div class="sk" style="height:40px;width:40px;border-radius:8px;flex-shrink:0"></div>
+              <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+                <div class="sk" style="height:12px;width:60%"></div>
+                <div class="sk-light" style="height:10px;width:85%"></div>
+              </div>
+            </div>
+          }
+        </div>
+        <div class="skeleton-card animate-pulse" style="min-height:280px">
+          <div class="sk" style="height:16px;width:160px;margin-bottom:16px"></div>
+          @for (_ of [1,2,3,4]; track $index) {
+            <div style="display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid #f3f4f6">
+              <div class="sk" style="height:10px;width:10px;border-radius:50%;flex-shrink:0"></div>
+              <div class="sk-light" style="height:14px;flex:1"></div>
+              <div class="sk-light" style="height:22px;width:80px;border-radius:4px;flex-shrink:0"></div>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+} @else {
+  <!-- ===== ADMIN SYSTEM DASHBOARD ===== -->
+  <div class="dashboard-page">
+    <!-- Header -->
+    <div class="header-bar">
+      <div class="header-inner">
+        <h1 class="page-title">Bảng điều khiển hệ thống</h1>
+        <div class="header-actions">
+          <!-- F-P2: shared <app-date-range-toggle> — drives windowed analytics
+               via parent re-fetch. Default 30 ngày. -->
+          <app-date-range-toggle
+            [value]="windowDays()"
+            ariaLabel="Khoảng thời gian báo cáo"
+            (change)="windowDaysChange.emit($event)" />
+          <a routerLink="/admin/users/all"
+             [queryParams]="{ action: 'create' }"
+             class="btn-primary">
+            <app-icon name="plus" size="sm" aria-hidden="true" />
+            Thêm người dùng
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="dashboard-main">
+      <!-- ① Metrics Strip (Stripe pattern — 4 cells, no icons).
+           Migrated to shared <app-kpi-card> per CC-01 (mega audit 2026-04-25)
+           — same visual contract as before, but every other admin surface now
+           consumes the same component instead of bespoke .metric-cell markup.
+           Mỗi card có [route] drill-down (Stripe / Coursera / Vercel pattern):
+           click vào KPI → mở report tương ứng. -->
+      <div class="metrics-strip">
+        <app-kpi-card
+          [value]="analytics().totalUsers | number"
+          label="Tổng người dùng"
+          [trend]="analytics().userGrowth.growthRate"
+          route="/admin/users/all" />
+        <app-kpi-card
+          [value]="(analytics().revenue | number:'1.0-0') + ' ₫'"
+          label="Doanh thu tháng này"
+          [trend]="analytics().revenueGrowth"
+          route="/admin/payouts" />
+        <app-kpi-card
+          [value]="analytics().pendingCourses | number"
+          label="Khóa học chờ duyệt"
+          [variant]="analytics().pendingCourses > 0 ? 'warning' : 'default'"
+          [sub]="analytics().pendingCourses > 0 ? 'Cần xử lý' : 'Đã xử lý hết'"
+          route="/admin/courses/review" />
+        <app-kpi-card
+          [value]="analytics().totalCourses | number"
+          label="Tổng khóa học"
+          [trend]="analytics().courseGrowth"
+          [sub]="'· ' + analytics().approvedCourses + ' đã duyệt'"
+          route="/admin/courses" />
+      </div>
+
+      <!--
+        Biểu đồ doanh thu 30 ngày trước đây dựng từ dailyAvg + Math.sin(...)
+        → dữ liệu synthetic hiển thị như số liệu thật. Sẽ khôi phục khi
+        backend expose endpoint daily revenue (cùng pattern với org-admin
+        dashboard sau PR #145 / issue #75).
+      -->
+
+      <!-- ② Pending Approvals + System Health
+           SOTA pattern (Stripe Failed Payments, Linear Inbox, Jira Security
+           Recommendations): action queue prioritized ngay sau KPI strip.
+           "Quick Actions" card cũ đã bỏ — duplicate sidebar (0/12 SOTA
+           platforms khảo sát có pattern đó). Sidebar đã expose all routes. -->
+      <div class="content-grid grid-2-1">
+        <div class="card pending-card">
+          <div class="card-header">
+            <h2 class="card-title">
+              Danh sách chờ duyệt
+              @if (analytics().pendingCourses > 0) {
+                <span class="count-badge" aria-label="số yêu cầu chờ duyệt">
+                  {{ analytics().pendingCourses | number }}
+                </span>
+              }
+            </h2>
+          </div>
+          <div class="card-body">
+            @if (isLoadingPending()) {
+              <div class="table-loading">
+                <div class="spinner"></div>
+                <span>Đang tải...</span>
+              </div>
+            } @else if (pendingApprovals().length === 0) {
+              <div class="table-empty">
+                <svg class="empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p class="empty-title">Hàng đợi đã sạch</p>
+                <p class="empty-desc">Khi giảng viên nộp khóa học mới, khóa đó sẽ hiện ở đây để bạn duyệt.</p>
+                <a routerLink="/admin/courses" class="empty-cta">
+                  Xem tất cả khóa học
+                  <app-icon name="arrow-right" size="sm" aria-hidden="true" />
+                </a>
+              </div>
+            } @else {
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Tên</th>
+                    <th>Loại</th>
+                    <th>Ngày gửi</th>
+                    <th>Hành động</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (approval of visiblePendingApprovals(); track approval.id) {
+                    <tr>
+                      <td>{{ approval.name }}</td>
+                      <td>
+                        @if (approval.type === 'course') {
+                          <span class="badge badge-primary">Khóa học</span>
+                        } @else {
+                          <span class="badge badge-purple">Giảng viên</span>
+                        }
+                      </td>
+                      <td class="date-text" [title]="approval.submittedDate">
+                        {{ formatRelativeTime(approval.submittedDate) }}
+                      </td>
+                      <td>
+                        <div class="action-btns">
+                          <button class="btn-approve" (click)="approveCourse(approval.id)">Duyệt</button>
+                          <button class="btn-reject" (click)="openRejectModal(approval.id, approval.name)">Từ chối</button>
+                        </div>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+              @if (hasMorePending()) {
+                <a routerLink="/admin/courses/review" class="view-all-link">
+                  Xem tất cả {{ analytics().pendingCourses | number }} yêu cầu
+                  <app-icon name="arrow-right" size="sm" aria-hidden="true" />
+                </a>
+              }
+            }
+          </div>
+        </div>
+
+        <!-- System Health — single real status from /actuator/health (F-06).
+             Previous 4-row breakdown (api/db/email/storage) was synthetic —
+             the analytics API never returned those fields. -->
+        <div class="card health-card">
+          <div class="card-header">
+            <h2 class="card-title">Trạng thái hệ thống</h2>
+            <button
+              type="button"
+              class="health-refresh"
+              (click)="refreshHealth()"
+              [disabled]="health.loading()"
+              [attr.aria-label]="'Làm mới trạng thái hệ thống'">
+              <app-icon name="refresh" size="sm" aria-hidden="true" />
+              <span class="sr-only">Làm mới</span>
+            </button>
+          </div>
+          <div class="health-summary">
+            @if (health.status() === 'unknown') {
+              <div class="health-row health-row-unknown">
+                <div class="health-dot warn"></div>
+                <div class="health-text">
+                  <p class="health-name">Đang kiểm tra...</p>
+                  <p class="health-meta">Đang gọi /actuator/health</p>
+                </div>
+              </div>
+            } @else if (health.status() === 'up') {
+              <div class="health-row health-row-up">
+                <div class="health-dot healthy"></div>
+                <div class="health-text">
+                  <p class="health-name">Hệ thống đang hoạt động</p>
+                  <p class="health-meta">
+                    Cập nhật lúc {{ health.lastChecked() | date:'HH:mm:ss' }}
+                  </p>
+                </div>
+                <span class="health-badge status-ok">UP</span>
+              </div>
+            } @else {
+              <div class="health-row health-row-down">
+                <div class="health-dot error"></div>
+                <div class="health-text">
+                  <p class="health-name">Hệ thống gặp sự cố</p>
+                  <p class="health-meta">
+                    Lần kiểm tra cuối: {{ health.lastChecked() | date:'HH:mm:ss' }}
+                  </p>
+                </div>
+                <span class="health-badge status-err">DOWN</span>
+              </div>
+            }
+            <p class="health-source">
+              Nguồn dữ liệu: <code>GET /actuator/health</code>
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Reject course modal -->
+<app-dialog
+  [open]="rejectModalOpen()"
+  title="Từ chối khóa học"
+  [subtitle]="pendingRejectName()"
+  size="md"
+  variant="danger"
+  role="alertdialog"
+  [busy]="rejecting()"
+  (close)="closeRejectModal()">
+
+  <div class="reject-form">
+    <label class="reject-label" for="reject-reason-system">
+      Lý do từ chối <span class="required">*</span>
+    </label>
+    <textarea
+      id="reject-reason-system"
+      class="reject-textarea"
+      rows="4"
+      placeholder="Mô tả chi tiết lý do từ chối khóa học này (tối thiểu 10 ký tự)..."
+      [value]="rejectReason()"
+      (input)="rejectReason.set($any($event.target).value)"
+    ></textarea>
+    @if (rejectReason().trim().length > 0 && !rejectReasonValid()) {
+      <p class="reject-hint error">Lý do cần ít nhất 10 ký tự.</p>
+    } @else {
+      <p class="reject-hint">{{ rejectReason().trim().length }}/10 ký tự tối thiểu</p>
+    }
+  </div>
+
+  <div dialogFooter>
+    <button type="button" class="btn-cancel" [disabled]="rejecting()" (click)="closeRejectModal()">Hủy</button>
+    <button
+      type="button"
+      class="btn-confirm-reject"
+      [disabled]="!rejectReasonValid() || rejecting()"
+      (click)="confirmReject()">
+      Từ chối khóa học
+    </button>
+  </div>
+</app-dialog>

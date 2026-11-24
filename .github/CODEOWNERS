@@ -1,0 +1,81 @@
+# CODEOWNERS for HoHoLiHu Maritime LMS
+#
+# Principle:
+# - Every critical surface has at least one accountable reviewer.
+# - @meiiie is the primary project owner; repository owners/admins retain full GitHub administrative authority.
+# - The last matching rule wins, so specific paths appear after broad paths.
+# - When the team grows, replace individual owners with GitHub teams.
+#
+# GitHub reference:
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default ownership
+* @meiiie @linhlinhlin
+
+# Repository governance and automation
+/.github/                       @meiiie @linhlinhlin
+/.coderabbit.yaml               @meiiie @linhlinhlin
+/scripts/github/                @meiiie @linhlinhlin
+/CONTRIBUTING.md                @meiiie @linhlinhlin
+/SECURITY.md                    @meiiie @linhlinhlin
+/CODE_OF_CONDUCT.md             @meiiie @linhlinhlin
+/SUPPORT.md                     @meiiie @linhlinhlin
+
+# Deploy, Docker, and production edge
+/deploy.sh                      @meiiie @linhlinhlin
+/deploy-video-worker.sh         @meiiie @linhlinhlin
+/Caddyfile                      @meiiie @linhlinhlin
+/docker-compose*.yml            @meiiie @linhlinhlin
+/.env*.example                  @meiiie @linhlinhlin
+/cloudflare/                    @meiiie @linhlinhlin
+
+# Backend domain boundaries
+/backend/pom.xml                                                @meiiie @linhlinhlin
+/backend/src/main/resources/application*.yml                    @meiiie @linhlinhlin
+/backend/src/main/resources/db/migration/                       @meiiie @linhlinhlin
+/backend/src/main/java/com/example/lms/identity/                @meiiie @linhlinhlin
+/backend/src/main/java/com/example/lms/course_authoring/        @meiiie @linhlinhlin
+/backend/src/main/java/com/example/lms/learning_delivery/       @meiiie @linhlinhlin
+/backend/src/main/java/com/example/lms/assessment/              @meiiie @linhlinhlin
+/backend/src/main/java/com/example/lms/ai_assistant/            @meiiie @linhlinhlin
+/backend/src/main/java/com/example/lms/communication/           @meiiie @linhlinhlin
+/backend/src/main/java/com/example/lms/shared/                  @meiiie @linhlinhlin
+/backend/src/main/java/com/example/lms/config/                  @meiiie @linhlinhlin
+
+# Frontend critical surfaces
+/fe/package.json                    @meiiie @linhlinhlin
+/fe/package-lock.json               @meiiie @linhlinhlin
+/fe/angular.json                    @meiiie @linhlinhlin
+/fe/ngsw-config.json                @meiiie @linhlinhlin
+/fe/scripts/                        @meiiie @linhlinhlin
+/fe/src/app/api/                    @meiiie @linhlinhlin
+/fe/src/app/core/                   @meiiie @linhlinhlin
+/fe/src/app/state/                  @meiiie @linhlinhlin
+/fe/src/app/app.config.ts           @meiiie @linhlinhlin
+/fe/src/app/app.routes.ts           @meiiie @linhlinhlin
+/fe/src/app/app.routes.server.ts    @meiiie @linhlinhlin
+
+# Product role surfaces
+/fe/src/app/features/auth/          @meiiie @linhlinhlin
+/fe/src/app/features/student/       @meiiie @linhlinhlin
+/fe/src/app/features/teacher/       @meiiie @linhlinhlin
+/fe/src/app/features/admin/         @meiiie @linhlinhlin
+/fe/src/app/features/learning/      @meiiie @linhlinhlin
+/fe/src/app/features/payment/       @meiiie @linhlinhlin
+/fe/src/app/shared/blocks/video-block/ @meiiie @linhlinhlin
+
+# Canonical docs and agent instructions
+/AGENTS.md                         @meiiie @linhlinhlin
+/CLAUDE.md                         @meiiie @linhlinhlin
+/CHANGELOG.md                      @meiiie @linhlinhlin
+/README.md                         @meiiie @linhlinhlin
+/docs/reference/                   @meiiie @linhlinhlin
+/docs/runbooks/                    @meiiie @linhlinhlin
+/docs/architecture/                @meiiie @linhlinhlin
+/docs/testing/                     @meiiie @linhlinhlin
+
+# AI tooling and specs
+/.agents/                          @meiiie @linhlinhlin
+/.claude/                          @meiiie @linhlinhlin
+/.specify/                         @meiiie @linhlinhlin
+/specs/                            @meiiie @linhlinhlin

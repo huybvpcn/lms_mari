@@ -1,0 +1,415 @@
+<div class="course-page">
+  <div class="header-bar">
+    <div class="header-inner">
+      <div>
+        <h1 class="page-title">{{ pageTitle() }}</h1>
+        <p class="page-subtitle">{{ pageSubtitle() }}</p>
+        @if (!isSystemAdmin() && organizationName()) {
+          <div class="mt-3 inline-flex items-center rounded-full bg-[#0056D2]/10 px-3 py-1 text-xs font-semibold text-[#0056D2]">
+            {{ organizationName() }}
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+
+  <div class="course-main">
+    @if (isLoading()) {
+      <div class="animate-pulse">
+        <div class="skeleton-strip">
+          @for (_ of [1,2,3,4]; track $index) {
+            <div class="skeleton-cell">
+              <div class="sk" style="width:60%;height:12px;margin-bottom:8px"></div>
+              <div class="sk" style="width:40%;height:20px;margin-bottom:4px"></div>
+              <div class="sk-light" style="width:50%;height:10px"></div>
+            </div>
+          }
+        </div>
+        <div class="skeleton-table" style="margin-bottom:20px">
+          <div style="padding:16px 20px">
+            <div class="sk" style="width:100%;height:36px;margin-bottom:12px"></div>
+            <div style="display:flex;gap:16px">
+              <div class="sk" style="width:140px;height:36px"></div>
+              <div class="sk" style="width:140px;height:36px"></div>
+              <div class="sk" style="width:100px;height:36px"></div>
+            </div>
+          </div>
+        </div>
+        <div class="skeleton-table">
+          <div class="skeleton-thead">
+            <div style="display:flex;gap:32px">
+              @for (_ of [1,2,3,4,5]; track $index) {
+                <div class="sk" style="width:80px;height:10px"></div>
+              }
+            </div>
+          </div>
+          @for (_ of [1,2,3,4,5]; track $index) {
+            <div class="skeleton-row">
+              <div class="sk" style="width:40px;height:40px;border-radius:8px;flex-shrink:0"></div>
+              <div style="flex:1">
+                <div class="sk" style="width:60%;height:12px;margin-bottom:6px"></div>
+                <div class="sk-light" style="width:40%;height:10px"></div>
+              </div>
+              <div class="sk" style="width:80px;height:12px"></div>
+              <div class="sk" style="width:70px;height:20px;border-radius:10px"></div>
+              <div class="sk" style="width:60px;height:12px"></div>
+            </div>
+          }
+        </div>
+      </div>
+    } @else {
+      <div class="metrics-strip">
+        <div class="metric-cell">
+          <p class="metric-value">{{ totalCourses() }}</p>
+          <p class="metric-label">{{ totalCoursesLabel() }}</p>
+          <p class="metric-sub">{{ totalCoursesSubLabel() }}</p>
+        </div>
+        <div class="metric-cell highlight">
+          <p class="metric-value warning">{{ pendingCourses() }}</p>
+          <p class="metric-label">Chờ phê duyệt</p>
+          <p class="metric-sub warning-text">Cần xem xét</p>
+        </div>
+        <div class="metric-cell">
+          <p class="metric-value">{{ approvedCourses() }}</p>
+          <p class="metric-label">Đã phê duyệt</p>
+          <p class="metric-sub">Đang hoạt động</p>
+        </div>
+        <div class="metric-cell">
+          <p class="metric-value">{{ formatCurrency(totalRevenue()) }}</p>
+          <p class="metric-label">{{ revenueLabel() }}</p>
+          <p class="metric-sub">{{ revenueSubLabel() }}</p>
+        </div>
+      </div>
+
+      <div class="filter-bar">
+        <div class="filter-row">
+          <div class="filter-search">
+            <input type="text"
+                   class="filter-input"
+                   [ngModel]="searchQuery()"
+                   (ngModelChange)="searchQuery.set($event)"
+                   (keyup.enter)="onFilterChange()"
+                   [placeholder]="searchPlaceholder()">
+          </div>
+          <div class="filter-actions">
+            <select class="filter-select"
+                    [ngModel]="statusFilter()"
+                    (ngModelChange)="statusFilter.set($event); onFilterChange()">
+              <option value="">Tất cả trạng thái</option>
+              <option value="draft">Nháp</option>
+              <option value="pending">Chờ phê duyệt</option>
+              <option value="approved">Đã phê duyệt</option>
+              <option value="rejected">Bị từ chối</option>
+            </select>
+            <select class="filter-select"
+                    [ngModel]="categoryFilter()"
+                    (ngModelChange)="categoryFilter.set($event); onFilterChange()">
+              <option value="">Tất cả danh mục</option>
+              @for (root of categoryTree(); track root.id) {
+                <option [value]="root.id">{{ root.name }}</option>
+                @for (sub of root.children; track sub.id) {
+                  <option [value]="sub.id">&nbsp;&nbsp;&#x21B3; {{ sub.name }}</option>
+                }
+              }
+            </select>
+            <button class="export-btn" (click)="exportCoursesToCsv()" title="Xuất CSV">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+              </svg>
+              Xuất CSV
+            </button>
+          </div>
+        </div>
+        <div class="filter-row">
+          <div class="date-group">
+            <label class="date-label">Từ ngày</label>
+            <input type="date"
+                   class="filter-date"
+                   [ngModel]="fromDate()"
+                   (ngModelChange)="fromDate.set($event); onFilterChange()">
+          </div>
+          <div class="date-group">
+            <label class="date-label">Đến ngày</label>
+            <input type="date"
+                   class="filter-date"
+                   [ngModel]="toDate()"
+                   (ngModelChange)="toDate.set($event); onFilterChange()">
+          </div>
+        </div>
+      </div>
+
+      <div class="table-card">
+        @if (courses().length > 0) {
+          <div class="table-scroll">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th class="col-checkbox">
+                    <input type="checkbox"
+                           class="tbl-checkbox"
+                           [checked]="allPendingSelected()"
+                           (change)="toggleSelectAll()"
+                           title="Chọn tất cả khóa học chờ phê duyệt">
+                  </th>
+                  <th>Khóa học</th>
+                  <th>Giảng viên</th>
+                  <th>Trạng thái</th>
+                  <th>Giá</th>
+                  <th>Học viên</th>
+                  <th class="col-actions">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (course of courses(); track course.id) {
+                  <tr>
+                    <td>
+                      @if (canReviewCourse(course)) {
+                        <input type="checkbox"
+                               class="tbl-checkbox"
+                               [checked]="isCourseSelected(course.id)"
+                               (change)="toggleCourseSelection(course.id)">
+                      }
+                    </td>
+                    <td>
+                      <div class="course-cell">
+                        @if (course.thumbnail) {
+                          <img class="course-thumb"
+                               [src]="course.thumbnail"
+                               [alt]="course.title"
+                               (error)="$any($event.target).style.display='none'">
+                        } @else {
+                          <div class="course-thumb-placeholder">
+                            <span>{{ (course.title || 'K').charAt(0).toUpperCase() }}</span>
+                          </div>
+                        }
+                        <div class="course-info">
+                          <div class="course-name">{{ course.title }}</div>
+                          <div class="course-desc">{{ course.shortDescription || 'Chưa có mô tả' }}</div>
+                          @if (course.level) {
+                            <span class="course-level">{{ getLevelText(course.level) }}</span>
+                          }
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <div class="teacher-cell">
+                        <div class="teacher-avatar">
+                          <span>{{ (course.teacherName || 'T').charAt(0).toUpperCase() }}</span>
+                        </div>
+                        <span class="teacher-name">{{ course.teacherName }}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <span class="badge" [class]="getCourseStatusClass(course)">
+                        {{ getCourseStatusText(course) }}
+                      </span>
+                      @if (course.rejectionReason && ['rejected', 'changes_requested'].includes(getWorkflowStatus(course).toLowerCase())) {
+                        <div class="rejection-hint" [title]="course.rejectionReason">
+                          {{ course.rejectionReason }}
+                        </div>
+                      }
+                    </td>
+                    <td>
+                      <div class="price-text">{{ course.price ? formatCurrency(course.price) : 'Miễn phí' }}</div>
+                    </td>
+                    <td>
+                      <div class="students-text">{{ course.enrolledCount || 0 }}</div>
+                    </td>
+                    <!-- Actions — CC-10: 5–7 icon buttons collapsed into a
+                         single shared kebab menu. Per-row gates (review,
+                         revoke, system admin) decide which menuitems show. -->
+                    <td>
+                      <div class="action-btns">
+                        <app-kebab-menu
+                          [actions]="rowActions(course)"
+                          [triggerAriaLabel]="'Mở menu thao tác cho khóa học ' + course.title"
+                          (actionClick)="onRowAction(course, $event)" />
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          @if (totalPages() > 1) {
+            <div class="pagination-bar">
+              <div class="pagination-info">
+                Hiển thị {{ getDisplayStart() }} - {{ getDisplayEnd() }} trong tổng số {{ totalElements() }} khóa học
+              </div>
+              <div class="pagination-controls">
+                <button class="pagination-btn" (click)="previousPage()" [disabled]="currentPage() === 0">Trước</button>
+                <span class="pagination-page">Trang {{ currentPage() + 1 }} / {{ totalPages() }}</span>
+                <button class="pagination-btn" (click)="nextPage()" [disabled]="currentPage() >= totalPages() - 1">Sau</button>
+              </div>
+            </div>
+          }
+        } @else {
+          <div class="empty-state">
+            <svg fill="currentColor" viewBox="0 0 20 20">
+              <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"></path>
+              <path fill-rule="evenodd" d="M4 5a2 2 0 012-2v1a1 1 0 001 1h6a1 1 0 001-1V3a2 2 0 012 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"></path>
+            </svg>
+            <h3 class="empty-title">{{ emptyTitle() }}</h3>
+            <p class="empty-desc">{{ emptyDescription() }}</p>
+          </div>
+        }
+      </div>
+    }
+  </div>
+</div>
+
+<app-dialog
+  [open]="showRejectModal()"
+  title="Từ chối khóa học"
+  [subtitle]="selectedCourse()?.title || ''"
+  size="md"
+  variant="danger"
+  (close)="closeRejectModal()">
+  <div class="modal-course-teacher">Giảng viên: {{ selectedCourse()?.teacherName || 'Không xác định' }}</div>
+  <label class="modal-field-label" for="reject-reason-input">Lý do từ chối *</label>
+  <textarea id="reject-reason-input"
+            class="modal-textarea textarea-danger"
+            [ngModel]="rejectionReason()"
+            (ngModelChange)="rejectionReason.set($event)"
+            name="rejectionReason"
+            rows="4"
+            required
+            placeholder="Vui lòng giải thích lý do từ chối khóa học này..."></textarea>
+  <div dialogFooter>
+    <button class="btn-cancel" (click)="closeRejectModal()">Hủy</button>
+    <button class="btn-danger" (click)="rejectCourse()" [disabled]="!rejectionReason()">Từ chối khóa học</button>
+  </div>
+</app-dialog>
+
+<app-dialog
+  [open]="showDetailModal()"
+  title="Chi tiết khóa học"
+  [subtitle]="selectedCourse()?.title || ''"
+  size="lg"
+  (close)="closeDetailModal()">
+  @if (selectedCourse()?.shortDescription) {
+    <div class="detail-section" style="margin-bottom:24px">
+      <h4 class="detail-section-title">Mô tả</h4>
+      <p class="detail-description">{{ selectedCourse()?.shortDescription }}</p>
+    </div>
+  }
+
+  <div class="detail-info-grid">
+    <div class="detail-field">
+      <span class="detail-field-label">Trạng thái</span>
+      <p class="detail-field-value">
+        {{ selectedCourse() ? getCourseStatusText(selectedCourse()!) : 'Không xác định' }}
+      </p>
+    </div>
+    <div class="detail-field">
+      <span class="detail-field-label">Giá</span>
+      <p class="detail-field-value">{{ selectedCourse()?.price ? formatCurrency(selectedCourse()!.price!) : 'Miễn phí' }}</p>
+    </div>
+    <div class="detail-field">
+      <span class="detail-field-label">Giảng viên</span>
+      <p class="detail-field-value">{{ selectedCourse()?.teacherName || 'Không xác định' }}</p>
+    </div>
+    <div class="detail-field">
+      <span class="detail-field-label">Học viên</span>
+      <p class="detail-field-value">{{ selectedCourse()?.enrolledCount || 0 }}</p>
+    </div>
+    <div class="detail-field">
+      <span class="detail-field-label">Ngày nộp</span>
+      <p class="detail-field-value">{{ selectedCourse()?.submittedAt ? formatDate(selectedCourse()!.submittedAt!) : 'Chưa nộp' }}</p>
+    </div>
+    @if (selectedCourse()?.approvedAt) {
+      <div class="detail-field">
+        <span class="detail-field-label">Ngày phê duyệt</span>
+        <p class="detail-field-value">{{ formatDate(selectedCourse()!.approvedAt!) }}</p>
+      </div>
+    }
+  </div>
+
+  @if (selectedCourse()?.rejectionReason) {
+    <div class="rejection-box">
+      <span class="rejection-box-label">Lý do từ chối</span>
+      <p class="rejection-box-text">{{ selectedCourse()!.rejectionReason }}</p>
+    </div>
+  }
+
+  <div class="revenue-banner">
+    <div>
+      <h4 class="revenue-label">{{ revenueLabel() }}</h4>
+      <p class="revenue-value">{{ selectedCourse()?.revenue ? formatCurrency(selectedCourse()!.revenue!) : '0 ₫' }}</p>
+    </div>
+  </div>
+
+  <div dialogFooter>
+    <button class="btn-cancel" (click)="closeDetailModal()">Đóng</button>
+    <button class="btn-primary-dark" (click)="openFullCourseView(selectedCourse()!.id)">Xem chi tiết đầy đủ</button>
+  </div>
+</app-dialog>
+
+<app-dialog
+  [open]="showBulkRejectModal()"
+  title="Từ chối hàng loạt"
+  [subtitle]="'Nhập lý do từ chối ' + selectedCount() + ' khóa học đã chọn'"
+  size="md"
+  variant="danger"
+  (close)="closeBulkRejectModal()">
+  <!-- Reason taxonomy — picking a preset seeds the textarea so reviewers
+       stay consistent across batches. "Lý do khác" clears the field. -->
+  <fieldset class="reject-preset-fieldset">
+    <legend class="reject-preset-legend">Chọn lý do mẫu</legend>
+    <div class="reject-preset-grid">
+      @for (preset of REJECT_REASON_PRESETS; track preset.key) {
+        <label class="reject-preset-option"
+               [class.is-active]="selectedRejectPreset() === preset.key">
+          <input type="radio"
+                 name="bulkRejectPreset"
+                 [value]="preset.key"
+                 [checked]="selectedRejectPreset() === preset.key"
+                 (change)="onSelectRejectPreset(preset.key)" />
+          <span>{{ preset.label }}</span>
+        </label>
+      }
+    </div>
+  </fieldset>
+  <label class="modal-field-label" for="bulk-reject-textarea">Lý do từ chối *</label>
+  <textarea id="bulk-reject-textarea"
+            class="modal-textarea textarea-danger"
+            [ngModel]="bulkRejectReason()"
+            (ngModelChange)="bulkRejectReason.set($event)"
+            name="bulkRejectReason"
+            rows="5"
+            placeholder="Vui lòng giải thích lý do từ chối..."></textarea>
+  <div dialogFooter>
+    <button class="btn-cancel" (click)="closeBulkRejectModal()">Hủy</button>
+    <button class="btn-danger" (click)="confirmBulkReject()" [disabled]="!bulkRejectReason().trim()">Từ chối ({{ selectedCount() }})</button>
+  </div>
+</app-dialog>
+
+<!-- Bulk action bar — slides up from bottom while selectedCount > 0.
+     Per audit guidance, bulk approve is NOT exposed (too high stakes); only
+     bulk reject with reason taxonomy + clear are available here. -->
+<app-bulk-action-bar
+  [selectedCount]="selectedCount()"
+  [actions]="bulkActions()"
+  countLabel="khóa học đã chọn"
+  (actionClick)="onBulkAction($event)"
+  (clear)="clearSelection()" />
+
+<app-dialog
+  [open]="showRevokeModal()"
+  title="Thu hồi phê duyệt"
+  subtitle="Nhập lý do thu hồi phê duyệt khóa học"
+  size="md"
+  variant="warning"
+  (close)="closeRevokeModal()">
+  <textarea class="modal-textarea textarea-warning"
+            [ngModel]="revokeReasonInput()"
+            (ngModelChange)="revokeReasonInput.set($event)"
+            name="revokeReason"
+            rows="3"
+            placeholder="Nhập lý do thu hồi..."></textarea>
+  <div dialogFooter>
+    <button class="btn-cancel" (click)="closeRevokeModal()">Hủy</button>
+    <button class="btn-warning" (click)="confirmRevokeCourse()" [disabled]="!revokeReasonInput().trim()">Thu hồi</button>
+  </div>
+</app-dialog>

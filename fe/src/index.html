@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>Đào tạo hàng hải trực tuyến - LMS Maritime</title>
+  <base href="/">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="LMS Maritime đào tạo hàng hải trực tuyến với khóa học STCW, an toàn, điều khiển tàu, AI trợ giảng và học ngoại tuyến cho thuyền viên Việt Nam. Xem khóa học.">
+  <meta name="keywords" content="đào tạo hàng hải trực tuyến, LMS hàng hải, STCW, an toàn hàng hải, điều khiển tàu, thuyền viên, học hàng hải online">
+  <meta name="author" content="LMS Maritime Team">
+  <meta name="robots" content="index, follow">
+
+  <!-- Search Engine Verification (redundant với BingSiteAuth.xml + GSC DNS verify) -->
+  <meta name="msvalidate.01" content="08B9D89FB9A6880E0769B1C6834F5297" />
+
+  <!--
+    Content Security Policy — embedded in HTML body so it travels with every
+    cached HTML response (NGSW, browser disk cache, CDN). Defense against
+    "stale CSP" bug: server-side CSP changes (Caddy header) only reach NEW
+    requests; cached HTML keeps OLD CSP forever otherwise. By baking CSP
+    into the HTML bytes, any change here flips the bundle hash → ngsw.json
+    invalidates → SW auto-updates → users get new policy without manual
+    /clear-site-data step.
+
+    Spec: meta + header CSPs are intersected (most restrictive wins). Keep
+    this list ⊇ Caddyfile to avoid accidentally removing allowed origins.
+    Header-only directives (frame-ancestors, report-to) live in Caddy only.
+  -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://accounts.google.com https://www.youtube.com https://*.ytimg.com; style-src 'self' 'unsafe-inline' https://accounts.google.com https://fonts.googleapis.com; img-src 'self' data: blob: https: http://localhost:8088 http://127.0.0.1:8088 https://ui-avatars.com https://*.ytimg.com; connect-src 'self' http://localhost:8000 http://127.0.0.1:8000 https://accounts.google.com https://lh3.googleusercontent.com https://ui-avatars.com https://fonts.googleapis.com https://fonts.gstatic.com https://wiii.holilihu.online https://cdn.holilihu.online https://media.holilihu.online https://*.r2.cloudflarestorage.com https://sandbox.vnpayment.vn https://pay.vnpay.vn https://qr.sepay.vn https://videodelivery.net https://www.youtube.com https://*.ytimg.com wss:; media-src 'self' data: blob: https: http://localhost:8088 http://127.0.0.1:8088; font-src 'self' data: https://fonts.gstatic.com; frame-src 'self' blob: http://localhost:8000 http://127.0.0.1:8000 https://wiii.holilihu.online https://media.holilihu.online https://accounts.google.com https://www.youtube.com https://www.youtube-nocookie.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self';">
+
+  <!-- PWA Meta Tags -->
+  <meta name="theme-color" content="#0056D2">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="LMS Maritime">
+  <meta name="msapplication-TileColor" content="#0056D2">
+  <meta name="msapplication-config" content="/browserconfig.xml">
+  
+  <!-- Icons (only reference sizes that exist in public/icons/) -->
+  <link rel="icon" type="image/png" sizes="72x72" href="icons/icon-72x72.png">
+  <link rel="icon" type="image/png" sizes="96x96" href="icons/icon-96x96.png">
+  <link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152x152.png">
+  <link rel="apple-touch-icon" sizes="144x144" href="icons/icon-144x144.png">
+  <link rel="apple-touch-icon" sizes="128x128" href="icons/icon-128x128.png">
+  <link rel="apple-touch-icon" sizes="96x96" href="icons/icon-96x96.png">
+  <link rel="apple-touch-icon" sizes="72x72" href="icons/icon-72x72.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png">
+  
+  <!-- Manifest -->
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  <!-- Prevent FOUC with inline critical CSS -->
+  <style>
+    /* Prevent flash of unstyled content */
+    body { 
+      margin: 0; 
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+      background-color: #FAFAFA;
+      color: #1F1F1F;
+    }
+    
+    /* Loading indicator */
+    .app-loading {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+    }
+    
+    .app-loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid #E5E7EB;
+      border-top-color: #0056D2;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+  
+  <!-- Canonical URL -->
+  <link rel="canonical" href="https://holilihu.online/">
+
+  <!-- Open Graph Meta Tags -->
+  <meta property="og:title" content="Đào tạo hàng hải trực tuyến - LMS Maritime">
+  <meta property="og:description" content="LMS Maritime đào tạo hàng hải trực tuyến với khóa học STCW, an toàn, điều khiển tàu, AI trợ giảng và học ngoại tuyến cho thuyền viên Việt Nam. Xem khóa học.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://holilihu.online/">
+  <meta property="og:image" content="https://holilihu.online/og-image.png">
+  <meta property="og:image:alt" content="LMS Maritime - đào tạo hàng hải trực tuyến">
+  <meta property="og:locale" content="vi_VN">
+  <meta property="og:site_name" content="LMS Maritime">
+
+  <!-- Twitter Card Meta Tags -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Đào tạo hàng hải trực tuyến - LMS Maritime">
+  <meta name="twitter:description" content="LMS Maritime đào tạo hàng hải trực tuyến với khóa học STCW, an toàn, điều khiển tàu, AI trợ giảng và học ngoại tuyến cho thuyền viên Việt Nam. Xem khóa học.">
+  <meta name="twitter:image" content="https://holilihu.online/og-image.png">
+  <meta name="twitter:image:alt" content="LMS Maritime - đào tạo hàng hải trực tuyến">
+
+  <!-- Structured Data: Organization + WebSite -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "EducationalOrganization",
+    "name": "LMS Maritime",
+    "url": "https://holilihu.online",
+    "logo": "https://holilihu.online/icons/icon-512x512.png",
+    "image": "https://holilihu.online/og-image.png",
+    "description": "Nền tảng đào tạo hàng hải trực tuyến cho thuyền viên Việt Nam, tích hợp AI trợ giảng và học ngoại tuyến.",
+    "sameAs": ["https://wiii.holilihu.online"]
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "LMS Maritime",
+    "url": "https://holilihu.online",
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": "https://holilihu.online/courses?q={search_term_string}",
+      "query-input": "required name=search_term_string"
+    }
+  }
+  </script>
+</head>
+<body>
+  <script>
+    // PWA Recovery — fixes broken Service Worker on client devices
+    // Usage: visit holilihu.online/?reset-sw to force-clear broken SW
+    // Also auto-recovers: if SW exists but fails to serve the page, clears on next load
+    (function() {
+      if (!('serviceWorker' in navigator)) return;
+
+      var isLocalRuntime = location.hostname === 'localhost' ||
+        location.hostname === '127.0.0.1' ||
+        location.hostname === '[::1]';
+
+      if (isLocalRuntime) {
+        navigator.serviceWorker.getRegistrations().then(function(regs) {
+          regs.forEach(function(r) { r.unregister(); });
+        });
+        caches.keys().then(function(names) {
+          names
+            .filter(function(name) { return name.indexOf('ngsw:') === 0; })
+            .forEach(function(name) { caches.delete(name); });
+        });
+        try { sessionStorage.removeItem('sw-health'); } catch(e) {}
+        return;
+      }
+
+      // Manual reset: ?reset-sw in URL
+      if (location.search.includes('reset-sw')) {
+        navigator.serviceWorker.getRegistrations().then(function(regs) {
+          regs.forEach(function(r) { r.unregister(); });
+        });
+        caches.keys().then(function(names) {
+          names.forEach(function(n) { caches.delete(n); });
+        });
+        // Reload clean (remove ?reset-sw param)
+        setTimeout(function() {
+          location.href = location.pathname;
+        }, 500);
+        return;
+      }
+
+      // Auto-recovery: detect truly broken SW state
+      // IMPORTANT: Don't check navigator.serviceWorker.controller — it's null on
+      // first load after SW install (NGSW doesn't clients.claim()). Instead check
+      // if a registration EXISTS. Only reset when no registration at all.
+      var key = 'sw-health';
+      try {
+        if (navigator.serviceWorker.controller) {
+          // SW is active and controlling — healthy
+          sessionStorage.removeItem(key);
+        } else if (navigator.onLine) {
+          navigator.serviceWorker.getRegistration().then(function(reg) {
+            if (reg) {
+              // Registration exists but not controlling yet — normal after install/update
+              sessionStorage.removeItem(key);
+            } else {
+              // No registration AND online — SW was truly lost
+              var fails = parseInt(sessionStorage.getItem(key) || '0', 10);
+              if (fails >= 3) {
+                // 4+ loads without any SW registration — force reset
+                sessionStorage.removeItem(key);
+                caches.keys().then(function(names) {
+                  names.forEach(function(n) { caches.delete(n); });
+                });
+                setTimeout(function() { location.reload(); }, 500);
+              } else {
+                sessionStorage.setItem(key, String(fails + 1));
+              }
+            }
+          });
+        }
+      } catch(e) { /* sessionStorage not available */ }
+    })();
+  </script>
+  <app-root>
+    <!-- Loading indicator shown until Angular bootstraps -->
+    <div class="app-loading">
+      <div class="app-loading-spinner"></div>
+      <p style="margin-top: 16px; color: #6B7280; font-size: 14px;">Đang tải...</p>
+    </div>
+  </app-root>
+  <noscript>
+    <div style="text-align: center; padding: 50px; font-family: Arial, sans-serif;">
+      <h1>JavaScript Required</h1>
+      <p>Vui lòng bật JavaScript để sử dụng ứng dụng LMS Maritime.</p>
+      <p>Please enable JavaScript to continue using this application.</p>
+    </div>
+  </noscript>
+</body>
+</html>

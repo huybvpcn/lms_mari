@@ -1,0 +1,750 @@
+@use '../../../../../../styles/variables' as *;
+
+/* ===== PAGE ===== */
+.dashboard-page {
+  background: $bg-page;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ===== HEADER ===== */
+.header-bar {
+  background: white;
+  border-bottom: 1px solid $border-default;
+}
+
+.header-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: $spacing-4 $spacing-6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $spacing-4;
+  flex-wrap: wrap;
+}
+
+.page-title {
+  font-size: $text-2xl;
+  font-weight: $font-bold;
+  color: $text-primary;
+  margin: 0;
+  line-height: $leading-tight;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;  // align date-range toggle (40px) with buttons (40px)
+  gap: $spacing-3;       // bumped from spacing-2 to give the toggle breathing room
+  flex-shrink: 0;
+}
+
+/* Header primary CTA — Stripe/Vercel pattern: single primary action với
+   leading icon ("+ Thêm..."), 40px tall (WCAG 2.2 SC 2.5.8). "Xem báo cáo"
+   secondary đã bỏ — duplicate sidebar nav (cùng anti-pattern Quick Actions
+   audit 2026-04-26). KPI cards click drill-down replace nhu cầu shortcut. */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: $spacing-2;
+  padding: $spacing-2 $spacing-4;
+  min-height: 40px;
+  font-size: $text-sm;
+  font-weight: $font-semibold;
+  border-radius: $radius-md;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background $transition-fast, border-color $transition-fast, color $transition-fast;
+  white-space: nowrap;
+  background: $blue-primary;
+  color: white;
+  border: 1px solid $blue-primary;
+
+  &:hover { background: $blue-hover; border-color: $blue-hover; }
+  &:active { background: $blue-pressed; border-color: $blue-pressed; }
+
+  @include focus-visible;
+}
+
+/* ===== MAIN ===== */
+.dashboard-main {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: $spacing-6;
+}
+
+/* ===== CARD BASE ===== */
+.card {
+  background: white;
+  border-radius: $radius-md;
+  border: 1px solid $border-default;
+  box-shadow: $shadow-sm;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $spacing-3;
+  padding: $spacing-4 $spacing-6;
+  border-bottom: 1px solid $border-light;
+}
+
+.card-title {
+  // H3 in 1.125 type ladder — bumps from $text-base (16) so card titles
+  // sit one rung above body and stay below H1 page title (24).
+  font-size: $text-lg;
+  font-weight: $font-semibold;
+  color: $text-primary;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: $spacing-2;
+}
+
+/* Inbox-style count badge — Linear "Inbox 12" / GitHub "Notifications (5)" /
+   Stripe "Disputes (3)" pattern. Hiển thị ngay sau title khi pendingCourses>0,
+   ẩn khi=0 để empty state trông sạch. Color đồng bộ KPI #3 warning amber. */
+.count-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px $spacing-2;
+  background: rgba($warning, 0.12);
+  color: $warning;
+  border-radius: 999px;
+  font-size: $text-xs;
+  font-weight: $font-semibold;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+}
+
+.card-body {
+  // Card padding 24px — Carbon / Polaris default for content cards.
+  padding: $spacing-6;
+  overflow-x: auto;
+}
+
+/* ===== ① METRICS STRIP (Stripe pattern) =====
+   Children are <app-kpi-card> components — see shared/components/admin/kpi-card.
+   This strip only owns the outer container shape and divider lines between
+   cards; each card paints its own value / label / trend. */
+.metrics-strip {
+  @extend .card;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  margin-bottom: $spacing-6;
+  overflow: hidden;
+
+  @include desktop { grid-template-columns: repeat(4, 1fr); }
+}
+
+.metrics-strip > app-kpi-card {
+  display: block;
+
+  &:nth-child(odd) { border-right: 1px solid $border-light; }
+  &:nth-child(-n+2) { border-bottom: 1px solid $border-light; }
+
+  @include desktop {
+    border-right: 1px solid $border-light;
+    border-bottom: none !important;
+    &:last-child { border-right: none; }
+  }
+}
+
+/* ===== ② CONTENT GRID ===== */
+.content-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: $spacing-4;
+  margin-bottom: $spacing-6;
+  min-width: 0;
+
+  &.grid-2-1 {
+    @include desktop { grid-template-columns: 2fr 1fr; }
+  }
+}
+
+/* ===== PENDING APPROVALS CARD =====
+   Promoted to primary action queue position (sau KPI strip), thay thế
+   "Quick Actions" card cũ vốn duplicate sidebar — pattern không có ở 0/12
+   SOTA admin dashboard khảo sát (Stripe Failed Payments, Linear Inbox,
+   Jira Security Recommendations đều inbox-first thay vì shortcut panel). */
+.pending-card { overflow: hidden; }
+
+/* ===== DATA TABLE ===== */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table thead tr {
+  background: $gray-50;
+  border-bottom: 1px solid $border-default;
+}
+
+.data-table th {
+  text-align: left;
+  font-size: $text-xs;
+  font-weight: $font-semibold;
+  color: $gray-500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: $spacing-3 $spacing-4;
+}
+
+.data-table td {
+  padding: $spacing-3 $spacing-4;
+  font-size: $text-sm;
+  vertical-align: middle;
+}
+
+.data-table tbody tr {
+  border-bottom: 1px solid $border-light;
+  transition: background $transition-fast;
+
+  &:last-child { border-bottom: none; }
+  &:hover { background: $gray-50; }
+}
+
+.date-text {
+  color: $text-muted;
+  // Tooltip cursor giúp user biết hover xem full timestamp ISO
+  cursor: help;
+}
+
+/* Footer "Xem tất cả N yêu cầu" — Stripe "View all" / Vercel "Show all"
+   pattern khi widget chỉ render top 5. Subtle blue link, icon arrow trượt
+   nhẹ khi hover. Chỉ render khi `analytics.pendingCourses > visible.length`. */
+.view-all-link {
+  display: inline-flex;
+  align-items: center;
+  gap: $spacing-2;
+  margin: $spacing-3 $spacing-4 0;
+  padding: $spacing-2 0;
+  font-size: $text-sm;
+  font-weight: $font-medium;
+  color: $blue-primary;
+  text-decoration: none;
+  border-top: 1px solid $border-light;
+  width: calc(100% - #{$spacing-4} * 2);
+  justify-content: flex-end;
+  transition: color $transition-fast;
+
+  app-icon {
+    transition: transform $transition-fast;
+  }
+
+  &:hover {
+    color: $blue-hover;
+    app-icon { transform: translateX(2px); }
+  }
+
+  @include focus-visible;
+}
+
+/* Badges */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  // Tag-style padding — vertical 2px on 4pt baseline keeps badges compact
+  // next to body text; horizontal $spacing-3 (12px) gives breathing room.
+  padding: 2px $spacing-3;
+  border-radius: $radius-sm;
+  font-size: $text-xs;
+  font-weight: $font-medium;
+  white-space: nowrap;
+
+  &.badge-primary { background: rgba($blue-primary, 0.1); color: $blue-hover; }
+  &.badge-purple { background: #F3E8FF; color: #7C3AED; }
+}
+
+/* Action buttons */
+.action-btns {
+  display: flex;
+  gap: $spacing-2;
+}
+
+.btn-approve,
+.btn-reject {
+  padding: $spacing-1 $spacing-3;
+  font-size: $text-xs;
+  font-weight: $font-medium;
+  border: none;
+  border-radius: $radius-sm;
+  cursor: pointer;
+  transition: background $transition-normal;
+}
+
+.btn-approve {
+  background: $blue-primary;
+  color: white;
+
+  &:hover { background: $blue-hover; }
+}
+
+.btn-reject {
+  background: $gray-100;
+  color: $gray-600;
+
+  &:hover { background: $gray-200; }
+}
+
+/* Table loading / empty */
+.table-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: $spacing-3;
+  padding: $spacing-12 0;
+  color: $text-muted;
+  font-size: $text-sm;
+}
+
+.spinner {
+  width: $spacing-8;
+  height: $spacing-8;
+  // 3px stroke — keeps the ring visible at 32px without going thin or chunky.
+  border: 3px solid $gray-200;
+  border-top-color: $blue-primary;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Empty state — Carbon Inform + Inspire + Activate pattern.
+   F-11: previous version only had icon + line. Added title, description, CTA. */
+.table-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: $spacing-8 $spacing-6;
+  color: $gray-400;
+  gap: $spacing-3;
+
+  .empty-icon {
+    width: $spacing-10;
+    height: $spacing-10;
+    color: $gray-300;
+  }
+
+  .empty-title {
+    font-size: $text-base;
+    font-weight: $font-semibold;
+    color: $text-primary;
+    margin: 0;
+  }
+
+  .empty-desc {
+    font-size: $text-sm;
+    color: $text-muted;
+    margin: 0;
+    max-width: 360px;
+    line-height: $leading-normal;
+  }
+
+  .empty-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: $spacing-2;
+    margin-top: $spacing-2;
+    padding: $spacing-2 $spacing-4;
+    min-height: 40px;
+    font-size: $text-sm;
+    font-weight: $font-semibold;
+    color: $blue-primary;
+    background: rgba($blue-primary, 0.06);
+    border: 1px solid rgba($blue-primary, 0.2);
+    border-radius: $radius-md;
+    text-decoration: none;
+    transition: background $transition-fast, border-color $transition-fast;
+
+    &:hover { background: rgba($blue-primary, 0.1); border-color: rgba($blue-primary, 0.3); }
+    @include focus-visible;
+  }
+}
+
+/* ===== HEALTH CARD =====
+   F-06: replaced 4-row fictional breakdown with single real /actuator/health
+   summary + lastChecked timestamp + manual refresh. */
+.health-summary {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-3;
+  padding: $spacing-4 $spacing-6;
+}
+
+.health-row {
+  display: flex;
+  align-items: center;
+  gap: $spacing-3;
+  padding: $spacing-3;
+  border-radius: $radius-md;
+  background: $gray-50;
+  transition: background $transition-fast;
+
+  &.health-row-up { background: rgba($success, 0.06); }
+  &.health-row-down { background: rgba($error, 0.06); }
+  &.health-row-unknown { background: rgba($warning, 0.06); }
+}
+
+.health-dot {
+  // 10px dot + 3px halo — small visual indicator, intentionally off-grid for
+  // optical balance against text-sm baseline. Halo (box-shadow spread) gives
+  // status badge prominence without fattening the dot itself.
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+
+  &.healthy { background: $success; box-shadow: 0 0 0 3px rgba($success, 0.15); }
+  &.error { background: $error; box-shadow: 0 0 0 3px rgba($error, 0.15); }
+  &.warn { background: $warning; box-shadow: 0 0 0 3px rgba($warning, 0.15); }
+}
+
+.health-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.health-name {
+  font-size: $text-sm;
+  font-weight: $font-semibold;
+  color: $text-primary;
+  margin: 0;
+}
+
+.health-meta {
+  font-size: $text-xs;
+  color: $text-muted;
+  margin: 2px 0 0; // 4pt baseline — tight pairing with name above
+  font-variant-numeric: tabular-nums;
+}
+
+.health-badge {
+  font-size: $text-xs;
+  font-weight: $font-bold;
+  padding: $spacing-1 $spacing-2;
+  border-radius: $radius-sm;
+  letter-spacing: 0.5px;
+
+  &.status-ok { background: $success-light; color: $success; }
+  &.status-err { background: $error-light; color: $error; }
+}
+
+.health-source {
+  font-size: $text-xs;
+  color: $text-muted;
+  margin: 0;
+
+  code {
+    font-family: $font-family-mono;
+    font-size: 11px; // mono fonts run visually larger; nudge down a step
+    background: $gray-100;
+    padding: 2px $spacing-1;
+    border-radius: $radius-sm;
+    color: $gray-700;
+  }
+}
+
+.health-refresh {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: $spacing-8;
+  height: $spacing-8;
+  padding: 0;
+  border: 1px solid $border-default;
+  border-radius: $radius-md;
+  background: white;
+  color: $text-muted;
+  cursor: pointer;
+  transition: background $transition-fast, color $transition-fast, border-color $transition-fast;
+
+  &:hover:not(:disabled) {
+    background: $gray-50;
+    color: $blue-primary;
+    border-color: $blue-primary;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  @include focus-visible;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ===== SKELETON ===== */
+.skeleton-strip {
+  @extend .card;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  overflow: hidden;
+  margin-bottom: $spacing-6;
+
+  @include desktop { grid-template-columns: repeat(4, 1fr); }
+}
+
+.skeleton-cell {
+  padding: $spacing-4 $spacing-6;
+
+  &:nth-child(odd) { border-right: 1px solid $border-light; }
+  &:nth-child(-n+2) { border-bottom: 1px solid $border-light; }
+
+  @include desktop {
+    border-right: 1px solid $border-light;
+    border-bottom: none !important;
+    &:last-child { border-right: none; }
+  }
+}
+
+.skeleton-card {
+  @extend .card;
+  padding: $spacing-6;
+}
+
+.sk { background: $gray-200; border-radius: $radius-sm; }
+.sk-light { background: $gray-100; border-radius: $radius-sm; }
+
+/* ===== RESPONSIVE ===== */
+
+// Tablet
+@media screen and (max-width: $breakpoint-md) {
+  .dashboard-main { padding: $spacing-6 $spacing-4; }
+  .header-inner { padding: $spacing-3 $spacing-4; }
+}
+
+// Mobile
+@media screen and (max-width: $breakpoint-sm) {
+  .dashboard-main { padding: $spacing-3; }
+  .header-inner { padding: $spacing-3; }
+  .page-title { font-size: $text-lg; }
+
+  // KPI strip layout only — value / label / sub sizing lives in the
+  // shared kpi-card component (CC-01).
+
+  .card-header { padding: $spacing-3 $spacing-4; }
+  .card-body { padding: $spacing-4; }
+  .card-title { font-size: $text-base; } // bumps body to 16, leaves space below 20 H2
+
+  .header-inner { flex-wrap: wrap; }
+  .header-actions { width: 100%; }
+  .btn-primary { flex: 1; min-height: 44px; }
+
+  .data-table th { padding: $spacing-2 $spacing-3; font-size: $text-xs; }
+  .data-table td { padding: $spacing-2 $spacing-3; font-size: $text-sm; }
+
+  .health-summary { padding: $spacing-3; }
+  .health-row { padding: $spacing-2 $spacing-3; }
+  .health-source { display: none; }
+
+  .table-empty {
+    padding: $spacing-8 $spacing-4;
+    .empty-icon { width: $spacing-10; height: $spacing-10; }
+  }
+
+  .content-grid { gap: $spacing-3; margin-bottom: $spacing-3; }
+}
+
+// Ultra-small (<340px)
+@media screen and (max-width: 340px) {
+  .dashboard-main { padding: $spacing-3 $spacing-2; }
+  // KPI sizing — see kpi-card.component.scss ultra-small media query.
+
+  .card-header { padding: $spacing-2 $spacing-3; }
+  .card-body { padding: $spacing-2 $spacing-3; }
+}
+
+/* ===== PRINT (A4 — clean report) ===== */
+@media print {
+  :host { display: block; }
+
+  .dashboard-page {
+    background: white !important;
+    min-height: auto !important;
+    overflow: visible !important;
+  }
+
+  .header-bar {
+    border-bottom: 2px solid $text-primary;
+  }
+
+  .header-inner {
+    padding: 8px 0 6px !important;
+    max-width: 100% !important;
+  }
+
+  .page-title { font-size: 18px !important; }
+
+  .dashboard-main {
+    padding: 10px 0 0 !important;
+    max-width: 100% !important;
+  }
+
+  // Cards: no shadow, thin border
+  .card, .metrics-strip {
+    box-shadow: none !important;
+    border: 1px solid $gray-300 !important;
+    border-radius: 2px !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  // Metrics: 4-col always, divider between cards.
+  .metrics-strip {
+    grid-template-columns: repeat(4, 1fr) !important;
+    margin-bottom: 10px !important;
+  }
+  .metrics-strip > app-kpi-card {
+    border-bottom: none !important;
+    border-right: 1px solid $gray-300;
+    &:last-child { border-right: none; }
+  }
+
+  // Grid: single column
+  .content-grid {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+    margin-bottom: 10px !important;
+  }
+
+  // Hide: actions, skeleton, header buttons
+  .action-btns { display: none !important; }
+  .header-actions { display: none !important; }
+  .skeleton-strip, .skeleton-card { display: none !important; }
+
+  // Table: condensed
+  .data-table th { padding: 6px 8px !important; font-size: 10px !important; }
+  .data-table td { padding: 6px 8px !important; font-size: 12px !important; }
+  .data-table tbody tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  // Health: compact
+  .health-summary { padding: 8px 12px !important; gap: 6px !important; }
+  .health-row { padding: 4px 8px !important; }
+  .health-refresh { display: none !important; }
+  .health-source { display: none !important; }
+
+  // Print colors — kpi-card value color comes from the shared component.
+  .badge, .health-dot, .health-badge {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
+/* ===== REJECT MODAL =====
+   Mirrors org-admin dashboard reject form (PR #145) so both portals
+   present an identical confirm UX backed by shared <app-dialog>.
+*/
+.reject-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reject-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #0f172a;
+
+  .required {
+    color: #dc2626;
+    margin-left: 2px;
+  }
+}
+
+.reject-textarea {
+  width: 100%;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #0f172a;
+  background: #f8fafc;
+  resize: vertical;
+  transition: border-color 0.15s;
+  font-family: inherit;
+  box-sizing: border-box;
+
+  &:focus {
+    outline: none;
+    border-color: #0056D2;
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(0, 86, 210, 0.08);
+  }
+
+  &::placeholder {
+    color: #94a3b8;
+  }
+}
+
+.reject-hint {
+  font-size: 12px;
+  color: #64748b;
+  margin: 0;
+
+  &.error {
+    color: #dc2626;
+  }
+}
+
+.btn-cancel {
+  padding: 8px 16px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #475569;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+
+  &:hover:not(:disabled) {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.btn-confirm-reject {
+  padding: 8px 20px;
+  border: none;
+  border-radius: 8px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+
+  &:hover:not(:disabled) {
+    background: #b91c1c;
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}

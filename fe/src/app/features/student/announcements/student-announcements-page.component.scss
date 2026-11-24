@@ -1,0 +1,17 @@
+.announcement-pagination {
+  display: block;
+  margin: 24px auto 8px;
+  width: 100%;
+  max-width: 1060px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+@media (max-width: 640px) {
+  .announcement-pagination {
+    margin-top: 20px;
+  }
+}

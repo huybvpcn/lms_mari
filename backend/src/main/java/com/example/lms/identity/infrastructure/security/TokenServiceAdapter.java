@@ -1,0 +1,90 @@
+package com.example.lms.identity.infrastructure.security;
+
+import com.example.lms.identity.application.port.TokenService;
+import io.jsonwebtoken.JwtException;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+/**
+ * Infrastructure adapter bridging the domain TokenService port to JwtService.
+ * Converts domain primitives into Spring Security UserDetails as needed by JwtService.
+ */
+@Component
+@RequiredArgsConstructor
+public class TokenServiceAdapter implements TokenService {
+
+    private final JwtService jwtService;
+
+    @Override
+    public String extractEmail(String token) {
+        try {
+            return jwtService.extractUsername(token);
+        } catch (JwtException | IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
+    @Override
+    public boolean isTokenValid(String token, String email) {
+        UserDetails userDetails = toUserDetails(email);
+        try {
+            return jwtService.isTokenValid(token, userDetails);
+        } catch (JwtException | IllegalArgumentException ex) {
+            return false;
+        }
+    }
+
+    @Override
+    public boolean isRefreshToken(String token) {
+        try {
+            return jwtService.isRefreshToken(token);
+        } catch (JwtException | IllegalArgumentException ex) {
+            return false;
+        }
+    }
+
+    @Override
+    public String generateAccessToken(UUID userId, String email, String role) {
+        Map<String, Object> claims = Map.of(
+            "userId", userId.toString(),
+            "role", role
+        );
+        UserDetails userDetails = toUserDetails(email);
+        return jwtService.generateToken(claims, userDetails);
+    }
+
+    @Override
+    public String generateRefreshToken(UUID userId, String email, String role) {
+        UserDetails userDetails = toUserDetails(email);
+        return jwtService.generateRefreshToken(userDetails);
+    }
+
+    @Override
+    public String generateRefreshToken(UUID userId, String email, String role, long expirationMs) {
+        UserDetails userDetails = toUserDetails(email);
+        return jwtService.generateRefreshToken(userDetails, expirationMs);
+    }
+
+    @Override
+    public String generateAccessToken(UUID userId, String email, String role, UUID organizationId) {
+        java.util.HashMap<String, Object> claims = new java.util.HashMap<>();
+        claims.put("userId", userId.toString());
+        claims.put("role", role);
+        if (organizationId != null) {
+            claims.put("organizationId", organizationId.toString());
+        }
+        UserDetails userDetails = toUserDetails(email);
+        return jwtService.generateToken(claims, userDetails);
+    }
+
+    private UserDetails toUserDetails(String email) {
+        return new User(email, "", List.of(new SimpleGrantedAuthority("ROLE_USER")));
+    }
+}

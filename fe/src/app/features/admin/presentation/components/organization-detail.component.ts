@@ -1,0 +1,653 @@
+import { Component, signal, inject, OnInit, ChangeDetectionStrategy, computed, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { CommonModule } from '@angular/common';
+import { RouterModule, ActivatedRoute, Router } from '@angular/router';
+import { OrganizationService, OrgPaymentConfig } from '../../infrastructure/services/organization.service';
+import { ToastService } from '../../../../core/services/toast.service';
+import { ConfirmDialogService } from '../../../../core/services/confirm-dialog.service';
+import { AuthService } from '../../../../core/services/auth.service';
+import { Organization, OrganizationCapability, OrganizationInvite, OrgMember, OrganizationType } from '../../../../shared/types/user.types';
+import { KpiCardComponent } from '../../../../shared/components/admin/kpi-card/kpi-card.component';
+import { KebabMenuComponent, KebabAction } from '../../../../shared/components/admin/kebab-menu/kebab-menu.component';
+
+type Tab = 'overview' | 'members' | 'invites' | 'settings' | 'capabilities' | 'payment-config' | 'stats';
+
+const VALID_TABS: ReadonlySet<Tab> = new Set([
+  'overview', 'members', 'invites', 'settings', 'capabilities', 'payment-config', 'stats'
+]);
+
+const CAPABILITY_META: Record<string, { label: string; description: string }> = {
+  academic_catalog: {
+    label: 'Học vụ nền tảng',
+    description: 'Quản lý khoa, ngành, khóa, lớp hành chính và môn học của tổ chức.',
+  },
+  curriculum_plan: {
+    label: 'Chương trình đào tạo',
+    description: 'Thiết lập học kỳ, khung chương trình và danh sách môn trong từng chương trình.',
+  },
+  learning_packages: {
+    label: 'Gói học',
+    description: 'Tạo gói học, gắn course vào lớp triển khai và xử lý enrollment theo gói.',
+  },
+  org_payment_config: {
+    label: 'Cấu hình doanh thu',
+    description: 'Cấu hình tỷ lệ chia doanh thu và số tiền rút tối thiểu của tổ chức.',
+  },
+  org_payout_approval: {
+    label: 'Duyệt payout theo tổ chức',
+    description: 'Cho ORG_ADMIN xem, duyệt hoặc từ chối yêu cầu rút tiền trong phạm vi tổ chức.',
+  },
+};
+
+@Component({
+  selector: 'app-organization-detail',
+  imports: [CommonModule, RouterModule, KpiCardComponent, KebabMenuComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  templateUrl: './organization-detail.component.html',
+  styleUrl: './organization-detail.component.scss',
+})
+export class OrganizationDetailComponent implements OnInit {
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
+  private destroyRef = inject(DestroyRef);
+  private orgService = inject(OrganizationService);
+  private toast = inject(ToastService);
+  private confirmDialog = inject(ConfirmDialogService);
+  private readonly authService = inject(AuthService);
+  backRoute = computed(() => this.authService.userRole() === 'admin' ? '/admin/organizations' : '/org-admin/dashboard');
+
+  org = signal<Organization | null>(null);
+  members = signal<OrgMember[]>([]);
+  invites = signal<OrganizationInvite[]>([]);
+  isLoading = signal(true);
+  // Phase 2 (#235): default 'overview' — landing card cho org info + multi-tenant
+  // signals (type, isDefault). Deep-link via query param ?tab=members|invites...
+  activeTab = signal<Tab>('overview');
+
+  isCreatingInvite = signal(false);
+  isSendingEmail = signal(false);
+  newInviteCode = signal('');
+
+  isUpdating = signal(false);
+  editingTokenMemberId = signal('');
+
+  capabilities = signal<OrganizationCapability[]>([]);
+  isLoadingCapabilities = signal(false);
+  savingCapabilityKey = signal('');
+  canManageCapabilities = computed(() => this.authService.userRole() === 'admin');
+
+  // Payment config state
+  paymentConfig = signal<OrgPaymentConfig | null>(null);
+  isLoadingConfig = signal(false);
+  isSavingConfig = signal(false);
+  configPreviewPlatform = signal(20);
+  configPreviewTeacher = signal(70);
+  configPreviewMinPayout = signal(100000);
+  configPreviewOrgShare = computed(() => {
+    const org = 100 - this.configPreviewPlatform() - this.configPreviewTeacher();
+    return Math.round(org * 10) / 10;
+  });
+  configPreviewPlatformAmount = computed(() => Math.round(1000000 * this.configPreviewPlatform() / 100));
+  configPreviewTeacherAmount = computed(() => Math.round(1000000 * this.configPreviewTeacher() / 100));
+  configPreviewOrgAmount = computed(() => Math.round(1000000 * this.configPreviewOrgShare() / 100));
+  configError = computed(() => {
+    if (this.configPreviewPlatform() < 0 || this.configPreviewTeacher() < 0) {
+      return 'Tỷ lệ không thể âm';
+    }
+    const sum = this.configPreviewPlatform() + this.configPreviewTeacher();
+    if (sum > 100) return `Tổng phí nền tảng + giảng viên = ${sum}% > 100%`;
+    if (this.configPreviewOrgShare() < 0) return 'Tỷ lệ tổ chức không thể âm';
+    return '';
+  });
+  minPayoutError = computed(() => {
+    const amount = this.configPreviewMinPayout();
+    if (!Number.isFinite(amount)) return 'Số tiền rút tối thiểu không hợp lệ';
+    if (amount < 10000) return 'Số tiền rút tối thiểu phải ít nhất 10.000 VND';
+    return '';
+  });
+
+  activeInvites = computed(() => this.invites().filter(i => i.status === 'ACTIVE'));
+
+  // ---------------------------------------------------------------------
+  // F-OA-4: KPI strip — surfaces aggregate org health (member count, role
+  // breakdown, active invites) above the tab bar. Mirrors the kpi-card
+  // pattern used by every other admin surface (CC-01).
+  // ---------------------------------------------------------------------
+  totalMembers = computed(() => this.members().length);
+  activeMembers = computed(() => this.members().filter(m => m.enabled).length);
+  teacherCount = computed(() =>
+    this.members().filter(m => m.role?.toUpperCase() === 'TEACHER').length
+  );
+  studentCount = computed(() =>
+    this.members().filter(m => m.role?.toUpperCase() === 'STUDENT').length
+  );
+
+  readonly tabs = [
+    { key: 'overview' as Tab, label: 'Tổng quan' },
+    { key: 'members' as Tab, label: 'Thành viên' },
+    { key: 'invites' as Tab, label: 'Lời mời' },
+    { key: 'stats' as Tab, label: 'Thống kê' },
+    { key: 'capabilities' as Tab, label: 'Phân hệ' },
+    { key: 'payment-config' as Tab, label: 'Cấu hình doanh thu' },
+    { key: 'settings' as Tab, label: 'Cài đặt' }
+  ];
+
+  // Phase 3 PR 3 (#241): breadcrumb derive — Tổ chức/Trang chủ → Org Name → Tab.
+  activeTabLabel = computed(() =>
+    this.tabs.find(t => t.key === this.activeTab())?.label ?? ''
+  );
+  breadcrumbRootLabel = computed(() =>
+    this.authService.userRole() === 'admin' ? 'Tổ chức' : 'Trang chủ'
+  );
+
+  // Phase 2 (#235): multi-tenant signals — type badge variant + label + isDefault.
+  // Fallback dùng khi BE corruption / legacy data trả type=null hoặc value không
+  // map (BE đã có parseType warn fallback PARTNER, FE phản ánh chung).
+  private readonly orgTypeFallback = { label: 'Đối tác', cssClass: 'badge-org-type badge-org-type--partner' };
+  readonly orgTypeMeta: Record<OrganizationType, { label: string; cssClass: string }> = {
+    PLATFORM: { label: 'Nền tảng', cssClass: 'badge-org-type badge-org-type--platform' },
+    PARTNER:  { label: 'Đối tác',  cssClass: 'badge-org-type badge-org-type--partner' },
+    INTERNAL: { label: 'Nội bộ',   cssClass: 'badge-org-type badge-org-type--internal' }
+  };
+  /** Phase 2 (#235): null-safe lookup cho header + overview info card. */
+  orgTypeBadge = computed(() => {
+    const type = this.org()?.type;
+    return (type && this.orgTypeMeta[type]) || this.orgTypeFallback;
+  });
+
+  private orgId = '';
+
+  ngOnInit(): void {
+    this.orgId = this.route.snapshot.paramMap.get('id') || this.authService.currentUser()?.organizationId || '';
+    if (!this.orgId) {
+      this.isLoading.set(false);
+      this.toast.error('Không tìm thấy tổ chức để quản lý');
+      return;
+    }
+    // Phase 2 (#235): deep-link tab restore từ query param. takeUntilDestroyed
+    // giải phóng subscription khi component destroy — tránh leak trên admin
+    // route navigation. Pick up cả back/forward + share link.
+    this.route.queryParamMap
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(params => {
+        const requested = params.get('tab') as Tab | null;
+        if (requested && VALID_TABS.has(requested)) {
+          this.activeTab.set(requested);
+        }
+      });
+    this.loadAll();
+    this.loadCapabilities();
+    this.loadPaymentConfig();
+  }
+
+  /** Phase 2 (#235): chuyển tab + sync URL query param để deep-link / share. */
+  selectTab(tab: Tab): void {
+    this.activeTab.set(tab);
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { tab },
+      queryParamsHandling: 'merge',
+      replaceUrl: true
+    });
+  }
+
+  private loadAll(): void {
+    this.isLoading.set(true);
+    this.orgService.getOrganization(this.orgId).subscribe({
+      next: (org) => {
+        this.org.set(org);
+        this.isLoading.set(false);
+      },
+      error: () => {
+        this.toast.error('Không thể tải thông tin tổ chức');
+        this.isLoading.set(false);
+      }
+    });
+    this.loadMembers();
+    this.loadInvites();
+  }
+
+  private loadMembers(): void {
+    this.orgService.listMembers(this.orgId).subscribe({
+      next: (members) => this.members.set(members),
+      error: () => this.toast.error('Không thể tải danh sách thành viên')
+    });
+  }
+
+  private loadInvites(): void {
+    this.orgService.listInvites(this.orgId).subscribe({
+      next: (invites) => this.invites.set(invites),
+      error: () => this.toast.error('Không thể tải danh sách lời mời')
+    });
+  }
+
+  private loadCapabilities(): void {
+    this.isLoadingCapabilities.set(true);
+    this.orgService.listCapabilities(this.orgId).subscribe({
+      next: (capabilities) => {
+        this.capabilities.set(capabilities);
+        this.isLoadingCapabilities.set(false);
+      },
+      error: () => {
+        this.capabilities.set([]);
+        this.isLoadingCapabilities.set(false);
+        this.toast.error('Không thể tải cấu hình phân hệ');
+      }
+    });
+  }
+
+  capabilityLabel(key: string): string {
+    return CAPABILITY_META[key]?.label ?? key;
+  }
+
+  capabilityDescription(key: string): string {
+    return CAPABILITY_META[key]?.description ?? 'Phân hệ tùy chỉnh của tổ chức.';
+  }
+
+  toggleCapability(capability: OrganizationCapability, event: Event): void {
+    const checkbox = event.target as HTMLInputElement;
+    if (!this.canManageCapabilities()) {
+      checkbox.checked = capability.enabled;
+      return;
+    }
+
+    const enabled = checkbox.checked;
+    this.savingCapabilityKey.set(capability.key);
+    this.orgService.setCapability(this.orgId, capability.key, enabled).subscribe({
+      next: (updated) => {
+        this.capabilities.update(items => items.map(item => item.key === updated.key ? updated : item));
+        this.savingCapabilityKey.set('');
+        this.toast.success(
+          enabled ? 'Đã bật phân hệ' : 'Đã tắt phân hệ',
+          `${this.capabilityLabel(updated.key)} đã được cập nhật`
+        );
+      },
+      error: (err) => {
+        checkbox.checked = capability.enabled;
+        this.savingCapabilityKey.set('');
+        this.toast.error(err.error?.message || 'Không thể cập nhật phân hệ');
+      }
+    });
+  }
+
+  /** ORG_ADMIN cannot edit token expiry for ADMIN/ORG_ADMIN members */
+  canEditMember(member: OrgMember): boolean {
+    const currentRole = this.authService.userRole();
+    if (currentRole === 'admin') return true;
+    const memberRole = member.role?.toUpperCase();
+    return memberRole !== 'ADMIN' && memberRole !== 'ORG_ADMIN';
+  }
+
+  canRemoveMember(member: OrgMember): boolean {
+    const currentUser = this.authService.currentUser();
+    const currentRole = currentUser?.role?.toLowerCase();
+    // ADMIN can remove anyone except themselves
+    if (currentRole === 'admin') {
+      return member.id !== currentUser?.id;
+    }
+    // ORG_ADMIN cannot remove ADMIN or other ORG_ADMIN, and cannot remove themselves
+    const memberRole = member.role?.toLowerCase();
+    if (memberRole === 'admin' || memberRole === 'org_admin') return false;
+    return member.id !== currentUser?.id;
+  }
+
+  async removeMember(member: OrgMember): Promise<void> {
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Xóa thành viên',
+      message: `Bạn có chắc muốn xóa "${member.fullName}" (${member.email}) khỏi tổ chức?`,
+      variant: 'danger',
+      confirmText: 'Xóa',
+      cancelText: 'Hủy'
+    });
+    if (!confirmed) return;
+
+    this.orgService.removeMember(this.orgId, member.id).subscribe({
+      next: () => {
+        this.toast.success('Đã xóa thành viên', `"${member.fullName}" đã được xóa khỏi tổ chức`);
+        this.loadMembers();
+      },
+      error: (err) => this.toast.error(err.error?.message || 'Không thể xóa thành viên')
+    });
+  }
+
+  saveMemberTokenExpiry(memberId: string, value: string): void {
+    const days = value.trim() === '' ? null : parseInt(value, 10);
+    if (days !== null && (isNaN(days) || days < 1 || days > (this.org()?.tokenExpiryDays ?? 1095))) {
+      this.toast.warning(`Giá trị phải từ 1 đến ${this.org()?.tokenExpiryDays ?? 1095} ngày, hoặc để trống cho mặc định`);
+      return;
+    }
+
+    this.orgService.setMemberTokenExpiry(this.orgId, memberId, days).subscribe({
+      next: () => {
+        this.editingTokenMemberId.set('');
+        this.toast.success('Đã cập nhật cấu hình token');
+        this.loadMembers();
+      },
+      error: (err) => this.toast.error(err.error?.message || 'Không thể cập nhật cấu hình token')
+    });
+  }
+
+  createInviteCode(): void {
+    this.isCreatingInvite.set(true);
+    this.newInviteCode.set('');
+
+    this.orgService.createInviteCode(this.orgId, { expiryDays: 90 }).subscribe({
+      next: (invite) => {
+        this.isCreatingInvite.set(false);
+        this.newInviteCode.set(invite.code || '');
+        this.toast.success('Đã tạo mã mời', 'Mã mời sẵn sàng để chia sẻ');
+        this.loadInvites();
+      },
+      error: (err) => {
+        this.isCreatingInvite.set(false);
+        this.toast.error(err.error?.message || 'Không thể tạo mã mời');
+      }
+    });
+  }
+
+  sendEmailInvite(email: string): void {
+    if (!email || !email.includes('@')) {
+      this.toast.warning('Vui lòng nhập địa chỉ email hợp lệ');
+      return;
+    }
+    this.isSendingEmail.set(true);
+
+    this.orgService.sendEmailInvite(this.orgId, { email, expiryDays: 7 }).subscribe({
+      next: () => {
+        this.isSendingEmail.set(false);
+        this.toast.success('Đã gửi lời mời', `Lời mời đã được gửi đến ${email}`);
+        this.loadInvites();
+      },
+      error: (err) => {
+        this.isSendingEmail.set(false);
+        this.toast.error(err.error?.message || 'Không thể gửi lời mời');
+      }
+    });
+  }
+
+  async revokeInvite(invite: OrganizationInvite): Promise<void> {
+    const label = invite.type === 'CODE'
+      ? `mã mời "${invite.code}"`
+      : `lời mời email "${invite.email}"`;
+
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Thu hồi lời mời',
+      message: `Bạn có chắc muốn thu hồi ${label}? Lời mời sẽ không thể sử dụng nữa.`,
+      variant: 'warning',
+      confirmText: 'Thu hồi',
+      cancelText: 'Hủy'
+    });
+    if (!confirmed) return;
+
+    this.orgService.revokeInvite(this.orgId, invite.id).subscribe({
+      next: () => {
+        this.toast.success('Đã thu hồi lời mời');
+        this.loadInvites();
+      },
+      error: (err) => this.toast.error(err.error?.message || 'Không thể thu hồi lời mời')
+    });
+  }
+
+  updateOrg(name: string, description: string, tokenExpiryDays: number): void {
+    if (!name.trim()) {
+      this.toast.warning('Tên tổ chức là bắt buộc');
+      return;
+    }
+    this.isUpdating.set(true);
+
+    this.orgService.updateOrganization(this.orgId, {
+      name: name.trim(),
+      description: description.trim() || undefined,
+      tokenExpiryDays: tokenExpiryDays || 30
+    }).subscribe({
+      next: (updated) => {
+        this.org.set(updated);
+        this.isUpdating.set(false);
+        this.toast.success('Đã cập nhật tổ chức', 'Thay đổi đã được lưu thành công');
+      },
+      error: (err) => {
+        this.isUpdating.set(false);
+        this.toast.error(err.error?.message || 'Không thể cập nhật tổ chức');
+      }
+    });
+  }
+
+  private loadPaymentConfig(): void {
+    this.isLoadingConfig.set(true);
+    this.orgService.getPaymentConfig(this.orgId).subscribe({
+      next: (config) => {
+        this.paymentConfig.set(config);
+        this.configPreviewPlatform.set(config.platformFeePct);
+        this.configPreviewTeacher.set(config.teacherSharePct);
+        this.configPreviewMinPayout.set(config.minPayoutAmount);
+        this.isLoadingConfig.set(false);
+      },
+      error: () => {
+        this.isLoadingConfig.set(false);
+        // Use defaults silently — org may not have custom config yet
+      }
+    });
+  }
+
+  savePaymentConfig(platformFeeStr: string, teacherShareStr: string, minPayoutStr: string): void {
+    const platformFeePct = parseFloat(platformFeeStr);
+    const teacherSharePct = parseFloat(teacherShareStr);
+    const minPayoutAmount = parseFloat(minPayoutStr);
+
+    if (isNaN(platformFeePct) || isNaN(teacherSharePct) || isNaN(minPayoutAmount)) {
+      this.toast.warning('Vui lòng nhập đầy đủ giá trị hợp lệ');
+      return;
+    }
+    if (platformFeePct + teacherSharePct > 100) {
+      this.toast.warning('Tổng phí nền tảng + giảng viên không thể vượt quá 100%');
+      return;
+    }
+    if (platformFeePct < 0 || teacherSharePct < 0) {
+      this.toast.warning('Tỷ lệ không thể âm');
+      return;
+    }
+    if (minPayoutAmount < 10000) {
+      this.toast.warning('Số tiền rút tối thiểu phải ít nhất 10.000 VND');
+      return;
+    }
+
+    // Update preview signals
+    this.configPreviewPlatform.set(platformFeePct);
+    this.configPreviewTeacher.set(teacherSharePct);
+    this.configPreviewMinPayout.set(minPayoutAmount);
+
+    this.isSavingConfig.set(true);
+    this.orgService.updatePaymentConfig(this.orgId, { platformFeePct, teacherSharePct, minPayoutAmount }).subscribe({
+      next: (config) => {
+        this.paymentConfig.set(config);
+        this.isSavingConfig.set(false);
+        this.toast.success('Đã cập nhật cấu hình doanh thu', `Platform ${config.platformFeePct}% / Giảng viên ${config.teacherSharePct}% / Tổ chức ${config.orgSharePct}%`);
+      },
+      error: (err) => {
+        this.isSavingConfig.set(false);
+        this.toast.error(err.error?.message || 'Không thể cập nhật cấu hình');
+      }
+    });
+  }
+
+  copyCode(code: string): void {
+    navigator.clipboard.writeText(code).then(() => {
+      this.toast.success('Đã sao chép mã mời vào clipboard');
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // F-OA-4: Per-row kebab menus — replaces the inline "Xóa" / "Thu hồi"
+  // text buttons that were the only row action. Mirrors admin-shared kebab
+  // pattern (PR #219) — every admin table now uses the same overflow
+  // surface.
+  // Phase 4 PR 3 (#258): thêm promote/demote ORG_ADMIN actions (ADMIN-only).
+  // ---------------------------------------------------------------------
+  memberRowActions(member: OrgMember): KebabAction[] {
+    const actions: KebabAction[] = [];
+    const role = member.role?.toUpperCase();
+    const isAdmin = this.authService.userRole() === 'admin';
+    const currentUserId = this.authService.currentUser()?.id;
+
+    if (this.canEditMember(member)) {
+      actions.push({
+        key: 'edit-token',
+        label: 'Chỉnh thời hạn token',
+        ariaLabel: `Chỉnh thời hạn token cho ${member.fullName}`,
+        // pencil
+        icon: 'M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z',
+      });
+    }
+
+    // Issue #258: Promote/demote ORG_ADMIN — ADMIN role only (boundary)
+    if (isAdmin && role !== 'ADMIN') {
+      if (role === 'ORG_ADMIN' && member.id !== currentUserId) {
+        actions.push({
+          key: 'demote-org-admin',
+          label: 'Hạ cấp xuống Giảng viên',
+          ariaLabel: `Hạ cấp ${member.fullName} xuống Giảng viên`,
+          // arrow-down
+          icon: 'M16 17l-4 4-4-4m8-5l-4 4-4-4m8-5l-4 4-4-4',
+        });
+      } else if (role !== 'ORG_ADMIN') {
+        actions.push({
+          key: 'promote-org-admin',
+          label: 'Bổ nhiệm Quản trị viên tổ chức',
+          ariaLabel: `Bổ nhiệm ${member.fullName} làm Quản trị viên tổ chức`,
+          // shield
+          icon: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
+        });
+      }
+    }
+
+    if (this.canRemoveMember(member)) {
+      actions.push({
+        key: 'remove',
+        label: 'Xóa khỏi tổ chức',
+        variant: 'danger',
+        ariaLabel: `Xóa ${member.fullName} khỏi tổ chức`,
+        // trash
+        icon: 'M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z',
+      });
+    }
+
+    return actions;
+  }
+
+  onMemberRowAction(member: OrgMember, key: string): void {
+    switch (key) {
+      case 'edit-token':
+        this.editingTokenMemberId.set(member.id);
+        break;
+      case 'promote-org-admin':
+        this.promoteOrgAdmin(member);
+        break;
+      case 'demote-org-admin':
+        this.demoteOrgAdmin(member);
+        break;
+      case 'remove':
+        this.removeMember(member);
+        break;
+    }
+  }
+
+  /** Issue #258 (Phase 4 PR 3): bổ nhiệm thành ORG_ADMIN sau confirm. */
+  async promoteOrgAdmin(member: OrgMember): Promise<void> {
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Bổ nhiệm Quản trị viên tổ chức',
+      message: `Bổ nhiệm "${member.fullName}" làm Quản trị viên của tổ chức này? Họ sẽ có quyền quản lý thành viên + lời mời.`,
+      variant: 'info',
+      confirmText: 'Bổ nhiệm',
+      cancelText: 'Hủy'
+    });
+    if (!confirmed) return;
+
+    this.orgService.promoteOrgAdmin(this.orgId, member.id).subscribe({
+      next: () => {
+        this.toast.success('Đã bổ nhiệm Quản trị viên tổ chức', `"${member.fullName}" giờ là ORG_ADMIN`);
+        this.loadMembers();
+      },
+      error: (err) => this.toast.error(err.error?.message || 'Không thể bổ nhiệm')
+    });
+  }
+
+  /** Issue #258 (Phase 4 PR 3): hạ cấp ORG_ADMIN xuống Giảng viên sau confirm. */
+  async demoteOrgAdmin(member: OrgMember): Promise<void> {
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Hạ cấp Quản trị viên',
+      message: `Hạ cấp "${member.fullName}" xuống Giảng viên? Họ sẽ mất quyền quản lý tổ chức.`,
+      variant: 'warning',
+      confirmText: 'Hạ cấp',
+      cancelText: 'Hủy'
+    });
+    if (!confirmed) return;
+
+    this.orgService.demoteOrgAdmin(this.orgId, member.id).subscribe({
+      next: () => {
+        this.toast.success('Đã hạ cấp', `"${member.fullName}" giờ là Giảng viên`);
+        this.loadMembers();
+      },
+      error: (err) => this.toast.error(err.error?.message || 'Không thể hạ cấp')
+    });
+  }
+
+  inviteRowActions(invite: OrganizationInvite): KebabAction[] {
+    const actions: KebabAction[] = [];
+
+    if (invite.code) {
+      actions.push({
+        key: 'copy',
+        label: 'Sao chép mã',
+        ariaLabel: `Sao chép mã mời ${invite.code}`,
+        // copy
+        icon: 'M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z',
+      });
+    }
+
+    if (invite.status === 'ACTIVE') {
+      actions.push({
+        key: 'revoke',
+        label: 'Thu hồi lời mời',
+        variant: 'danger',
+        ariaLabel: invite.type === 'CODE'
+          ? `Thu hồi mã mời ${invite.code}`
+          : `Thu hồi lời mời gửi đến ${invite.email}`,
+        // x-circle
+        icon: 'M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z',
+      });
+    }
+
+    return actions;
+  }
+
+  onInviteRowAction(invite: OrganizationInvite, key: string): void {
+    switch (key) {
+      case 'copy':
+        if (invite.code) this.copyCode(invite.code);
+        break;
+      case 'revoke':
+        this.revokeInvite(invite);
+        break;
+    }
+  }
+
+  getRoleBadgeClass(role: string): string {
+    switch (role) {
+      case 'ADMIN': return 'bg-red-50 text-red-700 border border-red-200';
+      case 'ORG_ADMIN': return 'bg-orange-50 text-orange-700 border border-orange-200';
+      case 'TEACHER': return 'bg-blue-50 text-blue-700 border border-blue-200';
+      case 'STUDENT': return 'bg-green-50 text-green-700 border border-green-200';
+      default: return 'bg-gray-50 text-gray-600 border border-gray-200';
+    }
+  }
+
+  getRoleLabel(role: string): string {
+    switch (role) {
+      case 'ADMIN': return 'Quản trị';
+      case 'ORG_ADMIN': return 'Chuyên viên';
+      case 'TEACHER': return 'Giảng viên';
+      case 'STUDENT': return 'Học viên';
+      default: return role;
+    }
+  }
+}

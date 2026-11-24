@@ -1,0 +1,451 @@
+
+    <div class="teacher-page">
+      <div class="page-inner">
+        <!-- Header -->
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">{{ pageTitle() }}</h1>
+            <p class="page-subtitle">{{ pageSubtitle() }}</p>
+          </div>
+          <button (click)="openCreateModal()" class="btn-create">
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>
+            Thêm Giảng viên
+          </button>
+        </div>
+
+        <!-- Stats Cards — migrated to shared <app-kpi-card> per CC-01. -->
+        <div class="stats-strip">
+          <app-kpi-card
+            [value]="totalTeachers()"
+            label="Tổng Giảng viên"
+            [sub]="activeTeachers() + ' đang hoạt động'" />
+
+          <app-kpi-card
+            [value]="totalCourses()"
+            label="Khóa học"
+            sub="Đang giảng dạy" />
+
+          <app-kpi-card
+            [value]="blockedTeachers()"
+            label="Bị khóa"
+            sub="Tài khoản bị khóa"
+            variant="error" />
+
+          <app-kpi-card
+            [value]="recentlyActive()"
+            label="Hoạt động gần đây"
+            sub="Trong 7 ngày qua" />
+        </div>
+
+        <!-- Search & Filter -->
+        <div class="filter-bar">
+          <div class="filter-row">
+            <div class="search-wrapper">
+              <svg fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/>
+              </svg>
+              <input type="text" [value]="searchQuery()" (input)="onSearchInput($any($event.target).value)"
+                     placeholder="Tìm kiếm theo tên hoặc email..."
+                     class="search-input">
+            </div>
+            <select [value]="statusFilter()" (change)="onStatusFilterChange($any($event.target).value)"
+                    class="filter-select">
+              <option value="">Tất cả trạng thái</option>
+              <option value="ACTIVE">Đang hoạt động</option>
+              <option value="BLOCKED">Bị khóa</option>
+              <option value="RESTRICTED">Hạn chế</option>
+            </select>
+          </div>
+          <div class="filter-summary">
+            <p>
+              Hiển thị <span class="count">{{ filteredTeachers().length }}</span>
+              trong tổng số <span class="count">{{ totalTeachers() }}</span> giảng viên
+            </p>
+          </div>
+        </div>
+
+        <!-- Teachers Table -->
+        <div class="table-card">
+          @if (isLoading()) {
+            <div class="table-loading">
+              <div class="spinner"></div>
+              <p>Đang tải danh sách giảng viên...</p>
+            </div>
+          } @else if (filteredTeachers().length === 0) {
+            <div class="table-empty">
+              <svg fill="currentColor" viewBox="0 0 20 20">
+                <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"></path>
+                <path fill-rule="evenodd" d="M4 5a2 2 0 012-2v1a1 1 0 001 1h6a1 1 0 001-1V3a2 2 0 012 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2V5z" clip-rule="evenodd"></path>
+              </svg>
+              <h3>Không tìm thấy giảng viên</h3>
+              <p>Thử điều chỉnh bộ lọc hoặc tìm kiếm với từ khóa khác</p>
+            </div>
+          } @else {
+            <div style="overflow-x: auto;">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th class="col-checkbox">
+                      <input type="checkbox"
+                             class="row-checkbox"
+                             [checked]="allVisibleSelected()"
+                             (change)="toggleSelectAll()"
+                             aria-label="Chọn tất cả giảng viên đang hiển thị" />
+                    </th>
+                    <th>Giảng viên</th>
+                    <th>Vai trò</th>
+                    <th>Trạng thái</th>
+                    <th>Khóa học</th>
+                    <th>Hoạt động</th>
+                    <th class="text-center">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (teacher of filteredTeachers(); track teacher.id) {
+                    <tr [class.row-selected]="isSelected(teacher.id)">
+                      <!-- Bulk select -->
+                      <td class="col-checkbox">
+                        <input type="checkbox"
+                               class="row-checkbox"
+                               [checked]="isSelected(teacher.id)"
+                               (change)="toggleSelection(teacher.id)"
+                               [attr.aria-label]="'Chọn ' + teacher.name" />
+                      </td>
+                      <!-- User Info -->
+                      <td>
+                        <div class="teacher-cell">
+                          <img [src]="getDefaultAvatar(teacher.email)" class="teacher-avatar">
+                          <div class="teacher-info">
+                            <div class="teacher-name">{{ teacher.name }}</div>
+                            <div class="teacher-email">{{ teacher.email }}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <!-- Role Change -->
+                      <td>
+                        <select [ngModel]="getRoleValue(teacher.role)"
+                                (ngModelChange)="onRoleChange(teacher.id, $event)"
+                                class="role-select">
+                          <option value="STUDENT">Học viên</option>
+                          <option value="TEACHER">Giảng viên</option>
+                          @if (isSystemAdmin()) {
+                            <option value="ADMIN">Quản trị viên</option>
+                          }
+                        </select>
+                      </td>
+                      <!-- Status -->
+                      <td>
+                        <span class="badge" [class]="getStatusBadgeClass(teacher.accountStatus)">
+                          <span class="status-dot" [class]="getStatusDotClass(teacher.accountStatus)"></span>
+                          {{ getStatusLabel(teacher.accountStatus) }}
+                        </span>
+                      </td>
+                      <!-- Courses - Clickable to view managed courses -->
+                      <td>
+                        <button (click)="viewTeacherCourses(teacher)" class="courses-btn">
+                          <div class="courses-owned">
+                            <svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+                              <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3z"></path>
+                            </svg>
+                            <span class="count">{{ teacher.coursesCreated || 0 }}</span>
+                            <span class="label">sở hữu</span>
+                          </div>
+                          @if ((teacher.coursesCooped || 0) > 0) {
+                            <div class="courses-coop">
+                              <span class="count">{{ teacher.coursesCooped }}</span>
+                              <span class="label">cộng tác</span>
+                            </div>
+                          }
+                        </button>
+                      </td>
+                      <!-- Last Login — relative time (Linear/GitHub/Stripe pattern,
+                           đồng bộ users/all PR #224). cursor-help + title chỉ khi
+                           có lastLogin (tránh hand cursor + tooltip rỗng). -->
+                      <td>
+                        <span class="date-text"
+                              [class.cursor-help]="teacher.lastLogin"
+                              [attr.title]="teacher.lastLogin || null">
+                          {{ teacher.lastLogin ? formatRelativeTime(teacher.lastLogin) : 'Chưa đăng nhập' }}
+                        </span>
+                      </td>
+                      <!-- Actions — CC-10: shared kebab replaces inline
+                           status select + delete icon. -->
+                      <td>
+                        <div class="actions-cell">
+                          <app-kebab-menu
+                            [actions]="rowActions(teacher)"
+                            [triggerAriaLabel]="'Mở menu thao tác cho ' + teacher.name"
+                            (actionClick)="onRowAction(teacher, $event)" />
+                        </div>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+            @if (totalPages() > 1) {
+              <div class="pagination-bar">
+                <div class="pagination-info">
+                  Hiển thị <strong>{{ pageStart() }}</strong> - <strong>{{ pageEnd() }}</strong>
+                  trong tổng số <strong>{{ totalItems() }}</strong> giảng viên
+                </div>
+                <div class="pagination-controls" aria-label="Phân trang giảng viên">
+                  <button (click)="goToPage(currentPage() - 1)" [disabled]="currentPage() === 1"
+                          class="pagination-btn pagination-arrow" aria-label="Trang trước">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                  </button>
+                  @for (page of paginationPages(); track $index) {
+                    @if (page === -1) {
+                      <span class="pagination-ellipsis">...</span>
+                    } @else {
+                      <button (click)="goToPage(page)"
+                              class="pagination-btn"
+                              [class.active]="currentPage() === page"
+                              [attr.aria-current]="currentPage() === page ? 'page' : null">
+                        {{ page }}
+                      </button>
+                    }
+                  }
+                  <button (click)="goToPage(currentPage() + 1)" [disabled]="currentPage() === totalPages()"
+                          class="pagination-btn pagination-arrow" aria-label="Trang tiếp theo">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                  </button>
+                </div>
+              </div>
+            }
+          }
+        </div>
+      </div>
+    </div>
+
+    <!-- Create Teacher Modal -->
+    @if (showCreateModal()) {
+      <div class="modal-overlay" (click)="closeCreateModal()">
+        <div class="modal-center">
+          <div class="modal-card" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+              <h3 class="modal-title">Thêm Giảng viên mới</h3>
+              <button (click)="closeCreateModal()" class="modal-close">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </button>
+            </div>
+            <div class="modal-body">
+              <div class="modal-form-group">
+                <label class="modal-label">Tên đầy đủ <span class="required">*</span></label>
+                <input type="text" [(ngModel)]="newTeacherName" placeholder="Nhập họ và tên" class="modal-input">
+              </div>
+              <div class="modal-form-group">
+                <label class="modal-label">Email <span class="required">*</span></label>
+                <input type="email" [(ngModel)]="newTeacherEmail" placeholder="email@example.com" class="modal-input">
+              </div>
+              <div class="info-box-purple">
+                <p>
+                  <span class="bold">Mật khẩu mặc định:</span> Password123! - Giảng viên nên đổi sau khi đăng nhập.
+                </p>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button (click)="closeCreateModal()" class="btn-secondary">Hủy</button>
+              <button (click)="createTeacher()" [disabled]="!newTeacherName() || !newTeacherEmail()" class="btn-primary">
+                Thêm giảng viên
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- View Courses Modal -->
+    @if (showCoursesModal() && selectedTeacher()) {
+      <div class="modal-overlay" (click)="closeCoursesModal()">
+        <div class="modal-center">
+          <div class="modal-card-lg" (click)="$event.stopPropagation()">
+            <div class="modal-header-purple">
+              <div>
+                <h3 class="modal-title">Khóa học đang quản lý</h3>
+                <p class="modal-subtitle">{{ selectedTeacher()?.name }} - {{ selectedTeacher()?.email }}</p>
+              </div>
+              <button (click)="closeCoursesModal()" class="modal-close">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </button>
+            </div>
+            <div class="modal-body-scroll">
+              @if (isLoadingCourses()) {
+                <div class="modal-loading">
+                  <div class="spinner-sm"></div>
+                  <p>Đang tải khóa học...</p>
+                </div>
+              } @else if (teacherCourses().length === 0 && coopCourses().length === 0) {
+                <div class="modal-empty">
+                  <svg fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3z"></path>
+                  </svg>
+                  <p>Giảng viên chưa có khóa học nào</p>
+                </div>
+              } @else {
+                <!-- Owned Courses Section -->
+                @if (teacherCourses().length > 0) {
+                  <div class="course-section">
+                    <h4 class="course-section-title title-purple">
+                      <svg fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3z"></path>
+                      </svg>
+                      Khóa học sở hữu ({{ teacherCourses().length }})
+                    </h4>
+                    <div class="course-list">
+                      @for (course of teacherCourses(); track course.id) {
+                        <div class="course-item course-owned">
+                          <div class="course-item-header">
+                            <div class="course-item-body">
+                              <h4 class="course-item-title">{{ course.title }}</h4>
+                              <div class="course-meta">
+                                <span class="badge-owner">Chủ sở hữu</span>
+                                <span [class]="course.status?.toUpperCase() === 'PUBLISHED' ? 'badge-published' :
+                                               course.status?.toUpperCase() === 'PENDING' ? 'badge-pending' : 'badge-draft'">
+                                  {{ course.status?.toUpperCase() === 'PUBLISHED' ? 'Đã xuất bản' :
+                                     course.status?.toUpperCase() === 'PENDING' ? 'Chờ duyệt' : 'Bản nháp' }}
+                                </span>
+                                <span class="meta-date">{{ formatDateValue(course.createdAt) }}</span>
+                                <span class="meta-students students-purple">{{ course.enrolledCount }} học viên</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <!-- Action buttons -->
+                          <div class="course-actions actions-purple">
+                            @if (course.status?.toUpperCase() === 'PENDING') {
+                              <button (click)="approveCourse(course.id)" class="btn-action action-approve">
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
+                                Phê duyệt
+                              </button>
+                              <button (click)="openRejectCourseModal(course.id)" class="btn-action action-reject">
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                                Từ chối
+                              </button>
+                            }
+                            <a [routerLink]="courseSearchRoute()" [queryParams]="{search: course.title}"
+                               class="btn-action action-detail">
+                              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                              </svg>
+                              Chi tiết
+                            </a>
+                            <button (click)="openFullCourseView(course.id)" class="btn-action action-view-full">
+                              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                              </svg>
+                              Xem đầy đủ
+                            </button>
+                          </div>
+                        </div>
+                      }
+                    </div>
+                  </div>
+                }
+
+                <!-- Co-op Courses Section -->
+                @if (coopCourses().length > 0) {
+                  <div class="course-section">
+                    <h4 class="course-section-title title-blue">
+                      <svg fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"></path>
+                      </svg>
+                      Khóa học cộng tác ({{ coopCourses().length }})
+                    </h4>
+                    <div class="course-list">
+                      @for (course of coopCourses(); track course.id) {
+                        <div class="course-item course-coop">
+                          <div class="course-item-header">
+                            <div class="course-item-body">
+                              <h4 class="course-item-title">{{ course.title }}</h4>
+                              <div class="course-meta">
+                                <span class="badge-collaborator">Cộng tác viên</span>
+                                <span class="meta-owner">Chủ sở hữu: {{ course.teacherName }}</span>
+                                <span [class]="course.status?.toUpperCase() === 'PUBLISHED' ? 'badge-published' :
+                                               course.status?.toUpperCase() === 'PENDING' ? 'badge-pending' : 'badge-draft'">
+                                  {{ course.status?.toUpperCase() === 'PUBLISHED' ? 'Đã xuất bản' :
+                                     course.status?.toUpperCase() === 'PENDING' ? 'Chờ duyệt' : 'Bản nháp' }}
+                                </span>
+                                <span class="meta-students students-blue">{{ course.enrolledCount }} học viên</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <!-- Action buttons for co-op (no approve/reject) -->
+                          <div class="course-actions actions-blue">
+                            <a [routerLink]="courseSearchRoute()" [queryParams]="{search: course.title}"
+                               class="btn-action action-detail">
+                              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                              </svg>
+                              Chi tiết
+                            </a>
+                            <button (click)="openFullCourseView(course.id)" class="btn-action action-view-blue">
+                              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                              </svg>
+                              Xem đầy đủ
+                            </button>
+                          </div>
+                        </div>
+                      }
+                    </div>
+                  </div>
+                }
+              }
+            </div>
+            <div class="modal-footer">
+              <button (click)="closeCoursesModal()" class="btn-close-full">Đóng</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- Reject Course Modal -->
+    @if (showRejectCourseModal()) {
+      <div class="reject-modal-overlay">
+        <div class="reject-modal-card">
+          <div class="reject-header">
+            <h3>Từ chối khóa học</h3>
+            <p>Nhập lý do từ chối khóa học</p>
+          </div>
+          <div class="reject-body">
+            <textarea
+              [ngModel]="rejectReasonInput()"
+              (ngModelChange)="rejectReasonInput.set($event)"
+              name="rejectReason"
+              rows="3"
+              class="reject-textarea"
+              placeholder="Nhập lý do từ chối..."
+            ></textarea>
+          </div>
+          <div class="reject-footer">
+            <button (click)="closeRejectCourseModal()" class="btn-reject-cancel">Hủy</button>
+            <button (click)="confirmRejectCourse()"
+                    [disabled]="!rejectReasonInput().trim()"
+                    class="btn-reject-confirm">
+              Từ chối
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- Bulk action bar — slides up from bottom while selectedCount > 0. -->
+    <app-bulk-action-bar
+      [selectedCount]="selectedCount()"
+      [actions]="bulkActions()"
+      countLabel="giảng viên đã chọn"
+      (actionClick)="onBulkAction($event)"
+      (clear)="clearSelection()" />

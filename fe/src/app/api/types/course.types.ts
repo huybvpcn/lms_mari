@@ -1,0 +1,371 @@
+export type DeliveryMode = 'SELF_PACED' | 'INSTRUCTOR_LED';
+
+import type { InteractiveVideoSpec } from './interactive-video.types';
+import type { SimulationSectionData } from './simulation.types';
+
+// Course Category (2-level hierarchy)
+export interface CourseCategoryDTO {
+  id: string;
+  parentId: string | null;
+  code: string;
+  name: string;
+  slug: string;
+  prefix: string | null;
+  description: string | null;
+  icon: string | null;
+  sortOrder: number;
+  active: boolean;
+  children: CourseCategoryDTO[];
+}
+
+// Course Tag
+export interface CourseTagDTO {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+export interface CreateCourseRequest {
+  categoryId: string;
+  title: string;
+  description?: string;
+  deliveryMode?: DeliveryMode;
+  priceType?: 'FREE' | 'PAID';
+  price?: number;
+  salePrice?: number;
+}
+
+export interface CourseSummary {
+  id: string;
+  code: string;
+  title: string;
+  description: string;
+  thumbnailUrl?: string;
+  status: string;
+  teacherName: string;
+  enrolledCount: number;
+  createdAt: string;
+  updatedAt?: string;
+  enrolled?: boolean;
+  isEnrolled?: boolean;
+  // Price fields (Dec 2025)
+  priceType?: 'FREE' | 'PAID' | 'SUBSCRIPTION';
+  price?: number;
+  salePrice?: number;
+  // Delivery mode + content stats
+  deliveryMode?: DeliveryMode;
+  allowOfflineDownload?: boolean;
+  sectionCount?: number;
+  lessonCount?: number;
+  maxStudents?: number;
+  averageRating?: number;
+  // Enrollment fields (from StudentEnrollmentControllerV3)
+  progress?: number;
+  totalLessons?: number;
+  completedLessons?: number;
+  enrolledAt?: string;
+  categoryName?: string;
+  categoryId?: string;
+  teacherRole?: 'OWNER' | 'CO_TEACHER';
+  /**
+   * Workflow state from BE (`TeacherCourseResponse.reviewState`):
+   *   draft | pending | rejected | approved | pending_changes | changes_requested | draft_changes
+   * Teachers need `changes_requested` specifically so the editor CTA flips from
+   * "Gửi duyệt" (DRAFT) to "Gửi duyệt lại" (REJECTED + CHANGES_REQUESTED).
+   */
+  reviewState?: string;
+  /** Latest rejection reason text — surface when status=REJECTED or reviewState=changes_requested. */
+  rejectionReason?: string;
+  /** Latest rejection category code (matches CourseRejectionCategory enum on BE). */
+  rejectionCategory?: string;
+}
+
+export interface CourseDetail {
+  id: string;
+  code: string;
+  title: string;
+  description: string;
+  thumbnailUrl?: string;
+  status: string;
+  reviewState?: string;
+  draftChangeStatus?: string | null;
+  pendingReleaseNotes?: string | null;
+  teacherId: string;
+  teacherName: string;
+  enrolledCount: number;
+  chapterCount: number;
+  createdAt: string;
+  updatedAt: string | null;
+
+  // Extended fields from CourseDetailDTO (Dec 2025)
+  instructorId?: string;
+  categoryId?: string;
+  categoryName?: string;
+  welcomeMessage?: string;
+  courseInformation?: string;
+  benefits?: string;
+  introVideoUrl?: string;
+  credits?: number;
+  visibility?: 'PUBLIC' | 'PRIVATE' | 'UNLISTED';
+
+  // Delivery mode
+  deliveryMode?: DeliveryMode;
+  allowOfflineDownload?: boolean;
+
+  // Price fields - CRITICAL for payment flow
+  priceType?: 'FREE' | 'PAID' | 'SUBSCRIPTION';
+  price?: number;
+  salePrice?: number;
+
+  // Collections loaded separately
+  tags?: string[];
+  teachingStaffIds?: string[];
+}
+
+// Course content for learning UI (old Section is now Chapter)
+export interface CourseContentChapter {
+  id: string;
+  title: string;
+  description: string;
+  orderIndex: number;
+  lessons: LessonSummary[];
+}
+
+// L3 Section (Renamed from Topic)
+export interface SectionSummary {
+  id: string;
+  title: string;
+  type: 'TEXT' | 'VIDEO' | 'QUIZ' | 'FILE' | 'SIMULATION';
+  content?: string;
+  videoAssetId?: string;
+  videoProcessingStatus?: string;
+  videoSourceKind?: 'ADAPTIVE_R2' | 'STREAM' | 'EXTERNAL' | 'LEGACY_DIRECT';
+  videoUrl?: string;
+  videoType?: 'YOUTUBE' | 'CLOUDFLARE' | 'ADAPTIVE_R2' | string;
+  streamVideoUid?: string;
+  cfObjectKey?: string;
+  fileUrl?: string;
+  duration?: number;
+  orderIndex: number;
+  isRequired?: boolean;
+  interactiveVideoSpec?: InteractiveVideoSpec | null;
+  simulationData?: SimulationSectionData | null;
+  availableOfflineProfiles?: Array<{
+    id: 'SAVER' | 'STANDARD' | 'HIGH' | 'ORIGINAL' | string;
+    label: string;
+    actualResolution?: string | null;
+    sizeBytes?: number | null;
+  }>;
+  quizData?: SectionQuizData;
+}
+
+export interface SectionQuizQuestionSummary {
+  id: string;
+  content: string;
+  difficulty?: 'EASY' | 'MEDIUM' | 'HARD' | string;
+}
+
+export interface SectionQuizData {
+  quizType?: string;
+  countsTowardCertificate?: boolean;
+  allowOffline?: boolean;
+  timeLimitMinutes?: number;
+  passingScore?: number;
+  maxAttempts?: number;
+  shuffleQuestions?: boolean;
+  shuffleOptions?: boolean;
+  showResultsImmediately?: boolean;
+  showCorrectAnswers?: boolean;
+  questions?: SectionQuizQuestionSummary[];
+}
+
+export interface LessonSummary {
+  id: string;
+  title: string;
+  description: string;
+  orderIndex: number;
+  isFree?: boolean;
+  locked?: boolean;
+  durationMinutes?: number;
+  lessonType?: string;
+  quizType?: string;
+  countsTowardCertificate?: boolean;
+  quizAllowOffline?: boolean;
+  content?: string;
+  videoUrl?: string;
+  sections?: SectionSummary[];
+}
+
+// Renamed from SectionDetail (L1) to ChapterDetail
+export interface ChapterDetail {
+  id: string;
+  title: string;
+  description: string;
+  orderIndex: number;
+  courseId: string;
+  courseTitle: string;
+  lessonsCount: number;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+export interface LessonDetail {
+  id: string;
+  title: string;
+  description: string;
+  content: string; // Deprecated/Fallback
+  videoUrl: string; // Deprecated/Fallback
+  durationMinutes: number;
+  orderIndex: number;
+  lessonType: 'LECTURE' | 'ASSIGNMENT' | 'QUIZ';
+  quizType?: string;
+  countsTowardCertificate?: boolean;
+  quizAllowOffline?: boolean;
+  sectionId: string; // This technically links to Chapter now (chapter_id), so maybe rename to chapterId? Backend returns chapterId if entity updated? 
+  // Backend Lesson.java has @JoinColumn(name = "chapter_id"). 
+  // But DTOs might still call it sectionId if not updated. 
+  // Let's assume backend CourseController returns correct field if I updated it.
+  // I did NOT update LessonDetail DTO in CourseController explicitly in my previous edit?
+  // Wait, I updated CourseController. LessonSummary is inside convertToChapterResponse.
+  // But there is NO LessonDetail DTO in CourseController I edited. 
+  // Maybe LessonController returns LessonDetail?
+  // I need to check LessonController later. For now, keep as is or rename if sure.
+  sectionTitle: string; // chapterTitle
+  courseId: string;
+  courseTitle: string;
+  createdAt: string;
+  updatedAt: string | null;
+  attachments?: LessonAttachment[];
+  sections?: SectionSummary[]; // New
+}
+
+export interface LessonAttachment {
+  id: string;
+  originalFileName: string;
+  fileUrl: string;
+  fileSize: number;
+  fileType: string;
+}
+
+// Renamed L1 Requests
+export interface CreateChapterRequest {
+  title: string;
+  description?: string;
+  orderIndex?: number;
+}
+
+export interface UpdateChapterRequest {
+  courseId: string; // Required by backend
+  title?: string;
+  description?: string;
+  orderIndex?: number;
+}
+
+// NEW L3 Requests
+export interface CreateSectionRequest {
+  lessonId: string;
+  title: string;
+  type?: 'TEXT' | 'VIDEO' | 'QUIZ' | 'FILE' | 'SIMULATION';
+  content?: string;
+  videoAssetId?: string;
+  videoUrl?: string;
+  videoType?: 'YOUTUBE' | 'CLOUDFLARE' | 'ADAPTIVE_R2' | string;
+  streamVideoUid?: string;
+  interactiveVideoSpec?: InteractiveVideoSpec | null;
+  simulationData?: SimulationSectionData | null;
+  duration?: number;
+  orderIndex?: number;
+  isRequired?: boolean;
+}
+
+export interface UpdateSectionRequest {
+  title?: string;
+  type?: 'TEXT' | 'VIDEO' | 'QUIZ' | 'FILE' | 'SIMULATION'; // Usually type shouldn't change, but ok
+  content?: string;
+  videoAssetId?: string;
+  videoUrl?: string;
+  videoType?: 'YOUTUBE' | 'CLOUDFLARE' | 'ADAPTIVE_R2' | string;
+  streamVideoUid?: string;
+  interactiveVideoSpec?: InteractiveVideoSpec | null;
+  simulationData?: SimulationSectionData | null;
+  duration?: number;
+  orderIndex?: number;
+  isRequired?: boolean;
+}
+
+// L3 Detail
+export interface SectionDetail { // New L3 Section
+  id: string;
+  title: string;
+  type: string;
+  content: string;
+  videoAssetId?: string;
+  videoProcessingStatus?: string;
+  videoSourceKind?: 'ADAPTIVE_R2' | 'STREAM' | 'EXTERNAL' | 'LEGACY_DIRECT';
+  videoUrl: string;
+  videoType?: 'YOUTUBE' | 'CLOUDFLARE' | 'ADAPTIVE_R2' | string;
+  streamVideoUid?: string;
+  cfObjectKey?: string;
+  interactiveVideoSpec?: InteractiveVideoSpec | null;
+  fileUrl: string;
+  previewPdfUrl?: string;
+  previewStatus?: 'PROCESSING' | 'READY' | 'FAILED' | string | null;
+  duration: number;
+  orderIndex: number;
+  lessonId: string;
+  isRequired?: boolean;
+  availableOfflineProfiles?: Array<{
+    id: 'SAVER' | 'STANDARD' | 'HIGH' | 'ORIGINAL' | string;
+    label: string;
+    actualResolution?: string | null;
+    sizeBytes?: number | null;
+  }>;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+export interface CreateLessonRequest {
+  title: string;
+  description?: string;
+  content?: string;
+  videoUrl?: string;
+  durationMinutes?: number;
+  orderIndex?: number;
+  type?: 'LECTURE' | 'ASSIGNMENT' | 'QUIZ';
+  lessonType?: 'LECTURE' | 'ASSIGNMENT' | 'QUIZ';
+  quizTimeLimit?: number;
+  quizMaxScore?: number;
+  quizMaxAttempts?: number;
+}
+
+export interface UpdateLessonRequest {
+  courseId: string;   // Required by backend
+  chapterId: string;  // Required by backend
+  title?: string;
+  description?: string;
+  lessonType?: string;  // Required by backend
+  content?: string;
+  videoUrl?: string;
+  durationMinutes?: number;
+  isRequired?: boolean;  // Required by backend
+  isPreview?: boolean;   // Required by backend
+  orderIndex?: number;
+  quizTimeLimit?: number;
+  quizPassingScore?: number;
+  quizMaxAttempts?: number;
+  assignmentDescription?: string;
+  assignmentInstructions?: string;
+  assignmentDueDate?: string;
+  assignmentMaxScore?: number;
+}
+
+export interface FileUploadResponse {
+  fileName: string;
+  originalFileName: string;
+  fileUrl: string;
+  fileSize: number;
+  contentType: string;
+  uploadedAt: string;
+}
+
+// Note: EnrollStudentRequest is defined in enrollment.types.ts

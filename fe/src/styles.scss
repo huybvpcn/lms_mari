@@ -1,0 +1,401 @@
+// @use rules MUST come first before any other rules
+@use '@angular/material' as mat;
+@use "tailwindcss";
+
+// Import variables after @use rules
+@use 'styles/variables' as *;
+@use 'styles/fonts';
+
+html {
+  @include mat.theme((color: (primary: mat.$azure-palette,
+        tertiary: mat.$blue-palette,
+      ),
+      typography: Roboto,
+      density: 0,
+    ));
+}
+
+body {
+  // Default the application to a light color theme. This can be changed to
+  // `dark` to enable the dark color theme, or to `light dark` to defer to the
+  // user's system settings.
+  color-scheme: light;
+
+  // Set a default background, font and text colors for the application using
+  // Angular Material's system-level CSS variables. Learn more about these
+  // variables at https://material.angular.dev/guide/system-variables
+  background-color: var(--c-bg);
+  color: var(--mat-sys-on-surface);
+  font: var(--mat-sys-body-medium);
+  transition: background-color var(--transition-normal), color var(--transition-normal);
+
+  // Reset the user agent margin.
+  margin: 0;
+}
+
+/* Global styles for LMS Maritime - Professional Design System */
+
+/* ===== DESIGN TOKENS ===== */
+:root {
+  /* Color Palette - Light Mode */
+  --c-bg: #F8FAFC;
+  --c-surface: #FFFFFF;
+  --c-text: #0A2A43;
+  /* Mariner text */
+  --c-muted: #4B5565;
+  --c-border: rgba(10, 42, 67, .08);
+  --c-primary: #1C5C86;
+  /* Mariner Blue */
+  --c-accent: #FFC861;
+  /* Sunburst Gold */
+  --c-accent-press: #E39A1C;
+  --c-focus: #FFC861;
+
+  /* Icon sizing tokens */
+  --icon-xs: 14px;
+  --icon-sm: 16px;
+  --icon-md: 20px;
+  --icon-lg: 24px;
+
+  /* Spacing tokens */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+
+  /* Border radius tokens */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+
+  /* Shadow tokens */
+  --shadow-elev-1: 0 1px 2px rgba(10, 42, 67, .06);
+  --shadow-elev-2: 0 6px 16px rgba(10, 42, 67, .12);
+  --shadow-elev-3: 0 12px 24px rgba(10, 42, 67, .18);
+
+  /* Transition tokens */
+  --transition-fast: 150ms cubic-bezier(.2, .8, .2, 1);
+  --transition-normal: 200ms cubic-bezier(.2, .8, .2, 1);
+  --transition-slow: 300ms cubic-bezier(.2, .8, .2, 1);
+}
+
+/* Dark Mode */
+.dark {
+  --c-bg: #0E1520;
+  --c-surface: #121A26;
+  --c-text: #E2E8F0;
+  --c-muted: #94A3B8;
+  --c-border: rgba(226, 232, 240, .08);
+  --c-primary: #123E5E;
+  --c-accent: #F2B650;
+  --c-accent-press: #C9901A;
+  --c-focus: #F2B650;
+
+  /* Adjust shadows for dark mode */
+  --shadow-elev-1: 0 1px 2px rgba(0, 0, 0, .2);
+  --shadow-elev-2: 0 6px 16px rgba(0, 0, 0, .3);
+  --shadow-elev-3: 0 12px 24px rgba(0, 0, 0, .4);
+}
+
+/* ===== BASE STYLES ===== */
+html {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color-scheme: light dark;
+}
+
+// Body styles moved to Angular Material section above to avoid conflicts
+
+/* ===== ACCESSIBILITY ===== */
+/* Skip link */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 6px;
+  background: var(--c-accent);
+  color: var(--c-text);
+  padding: 8px;
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+  z-index: 1000;
+  transition: top var(--transition-fast);
+}
+
+.skip-link:focus {
+  top: 6px;
+}
+
+/* Focus styles */
+*:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 2px;
+}
+
+/* Reduce motion */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ===== UTILITY CLASSES ===== */
+.text-balance {
+  text-wrap: balance;
+}
+
+.text-pretty {
+  text-wrap: pretty;
+}
+
+/* Custom scrollbar */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--c-border) transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: var(--c-border);
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: var(--c-muted);
+}
+
+/* Chat textarea — hide scrollbar arrows on Windows */
+app-message-input textarea::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+app-message-input textarea {
+  scrollbar-width: none;
+}
+
+/* ===== COMPONENT STYLES ===== */
+/* Button base styles */
+.btn-base {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  transition: all var(--transition-fast);
+  cursor: pointer;
+  border: none;
+  text-decoration: none;
+}
+
+.btn-base:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-base:active {
+  transform: translateY(1px);
+}
+
+/* Ghost button */
+.btn-ghost {
+  @extend .btn-base;
+  background: transparent;
+  color: var(--c-text);
+  padding: var(--space-sm) var(--space-md);
+}
+
+.btn-ghost:hover {
+  background: rgba(0, 0, 0, .05);
+}
+
+.dark .btn-ghost:hover {
+  background: rgba(255, 255, 255, .05);
+}
+
+/* Accent button */
+.btn-accent {
+  @extend .btn-base;
+  background: var(--c-accent);
+  color: #1A2432;
+  padding: var(--space-sm) var(--space-md);
+  font-weight: 600;
+  box-shadow: var(--shadow-elev-1);
+}
+
+.btn-accent:hover {
+  filter: brightness(1.05);
+}
+
+.btn-accent:active {
+  filter: brightness(0.95);
+}
+
+/* Input base styles */
+.input-base {
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  background: var(--c-surface);
+  color: var(--c-text);
+  font-size: 14px;
+  transition: all var(--transition-fast);
+}
+
+.input-base:focus {
+  outline: none;
+  border-color: var(--c-focus);
+  box-shadow: 0 0 0 2px rgba(255, 200, 97, .2);
+}
+
+.input-base::placeholder {
+  color: var(--c-muted);
+  opacity: 0.7;
+}
+
+/* Ensure html and body take full height */
+html,
+body {
+  height: 100%;
+}
+
+
+/* Loại bỏ margin đầu của P mặc định */
+.ck-content p:first-child {
+  margin-top: 0 !important;
+}
+
+/* ===== EDITORJS GLOBAL OVERRIDES =====
+   Must be global — component ::ng-deep is silently dropped in Angular 20 + ViewEncapsulation.None */
+.codex-editor__redactor {
+  padding-bottom: 20px !important;
+  margin-right: 0 !important;
+  padding-left: 35px !important;
+}
+
+.codex-editor {
+  width: 100%;
+  text-align: left;
+}
+
+.ce-block {
+  width: 100%;
+}
+
+.ce-paragraph {
+  padding-left: 0 !important;
+  margin-left: 0 !important;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.ce-block__content,
+.ce-toolbar__content {
+  max-width: 100% !important;
+  margin-left: 0 !important;
+}
+
+.ce-toolbar__actions {
+  left: -5px !important;
+  background: white;
+  border-radius: 4px;
+  transform: none !important;
+}
+
+/* Quiz-mode: hide AI FAB during focused quiz-taking (Canvas pattern) */
+body.quiz-taking-mode .floating-bubble-container {
+  display: none !important;
+}
+
+.codex-editor--empty .codex-editor__redactor {
+  padding-bottom: 10px !important;
+}
+
+/* ===== GLOBAL PRINT — ẩn app shell, chỉ in nội dung trang ===== */
+@media print {
+  /* Nền trắng, không scroll */
+  body {
+    background: white !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* 1) Desktop sidebar (fixed left panel chứa app-sidebar) */
+  app-student-layout-simple > div > div:has(> app-sidebar) {
+    display: none !important;
+  }
+  /* Fallback: ẩn sidebar trực tiếp */
+  app-sidebar { display: none !important; }
+
+  /* 2) Mobile sidebar overlay */
+  .mobile-sidebar-overlay { display: none !important; }
+
+  /* 3) Mobile top header (hamburger + avatar) */
+  header[class*="sticky"][class*="md:hidden"] {
+    display: none !important;
+  }
+
+  /* 4) Mobile bottom nav */
+  .mobile-bottom-nav,
+  nav[class*="mobile-bottom-nav"] {
+    display: none !important;
+  }
+
+  /* 5) AI chat panel */
+  app-chat-panel { display: none !important; }
+
+  /* 6) Main content: bỏ padding-left (sidebar offset), full width */
+  [class*="md:pl-72"],
+  [class*="md:pl-16"] {
+    padding-left: 0 !important;
+  }
+
+  /* 7) Layout wrapper: reset flex constraints (nguyên nhân in 2 trang)
+     min-h-screen ép full viewport = full A4 page height → nội dung nhỏ vẫn chiếm 1 trang
+     flex-1 stretch content area → phần trống đẩy tràn trang 2 */
+  app-student-layout-simple > div,
+  app-teacher-layout-simple > div {
+    min-height: auto !important;
+    height: auto !important;
+  }
+
+  /* Reset flex-1 trên main content wrappers → co lại vừa nội dung */
+  app-student-layout-simple main,
+  app-teacher-layout-simple main {
+    flex: none !important;
+    overflow: visible !important;
+    height: auto !important;
+  }
+
+  /* Reset flex containers bên trong layout */
+  [class*="flex-1"][class*="min-h-0"],
+  [class*="flex-col"][class*="flex-1"] {
+    flex: none !important;
+    min-height: auto !important;
+    height: auto !important;
+  }
+
+  /* 8) AI sidebar toggle + overlay: ẩn khi in */
+  .ai-sidebar-toggle,
+  .ai-sidebar,
+  .mobile-ai-overlay,
+  .resize-handle-track { display: none !important; }
+
+  /* Ẩn scrollbar khi in */
+  * { scrollbar-width: none; }
+  ::-webkit-scrollbar { display: none; }
+}

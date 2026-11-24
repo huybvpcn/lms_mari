@@ -1,0 +1,535 @@
+import { Injectable, inject, signal, computed } from '@angular/core';
+import { Observable, of, tap, map, catchError, throwError } from 'rxjs';
+import {
+  AssignmentAllocation,
+  DistributionType,
+  EnrolledStudent,
+  createAllocation,
+  getAllocatedStudents,
+  isStudentAllocated,
+  getAllocationStats,
+} from '../../features/teacher/assignment-hub/utils/allocation-utils';
+import {
+  StudentTask,
+  TaskStatus,
+  calculateTaskStatus,
+  sortTasksByDueDate,
+  groupTasksByStatus,
+  getEffectiveDeadline,
+  DeadlineOverride,
+} from '../../features/student/assignments/utils/task-utils';
+import { AllocationApi, AllocationResponse, AllocationStatsResponse } from '../../api/client/allocation.api';
+import { AssignmentApi } from '../../api/client/assignment.api';
+import { ApiClient } from '../../api/client/api-client';
+
+/**
+ * Distribution Service
+ *
+ * Quản lý logic giao bài tập với signal-based state management.
+ *
+ * @requirements 1.4, 6.2
+ */
+@Injectable({
+  providedIn: 'root',
+})
+export class DistributionService {
+  private allocationApi = inject(AllocationApi);
+  private assignmentApi = inject(AssignmentApi);
+  private apiClient = inject(ApiClient);
+
+  // State
+  private allocations = signal<AssignmentAllocation[]>([]);
+  private deadlineOverrides = signal<DeadlineOverride[]>([]);
+  private loading = signal(false);
+  private error = signal<string | null>(null);
+
+  // Computed
+  readonly isLoading = computed(() => this.loading());
+  readonly hasError = computed(() => this.error() !== null);
+  readonly errorMessage = computed(() => this.error());
+
+  /**
+   * Create a new allocation for an assignment (using real API)
+   */
+  createAllocation(
+    assignmentId: string,
+    courseId: string,
+    distributionType: DistributionType,
+    studentIds: string[] | null,
+    createdBy: string,
+    isIndividual: boolean = false,
+    classId: string | null = null
+  ): Observable<AssignmentAllocation> {
+    this.loading.set(true);
+    this.error.set(null);
+
+    return this.allocationApi.createOrUpdateAllocation(assignmentId, {
+      distributionType,
+      studentIds: studentIds || undefined,
+      classId: classId || undefined,
+      isIndividual
+    }).pipe(
+      map(response => {
+        const allocation = this.mapResponseToAllocation(response.data!, assignmentId, courseId, createdBy);
+        this.allocations.update((current) => {
+          // Replace existing or add new
+          const filtered = current.filter(a => a.assignmentId !== assignmentId);
+          return [...filtered, allocation];
+        });
+        this.loading.set(false);
+        return allocation;
+      }),
+      catchError(err => {
+        this.error.set('Không thể lưu cài đặt phân phối');
+        this.loading.set(false);
+        return throwError(() => err);
+      })
+    );
+  }
+
+  private mapResponseToAllocation(
+    response: AllocationResponse,
+    assignmentId: string,
+    courseId: string,
+    createdBy: string
+  ): AssignmentAllocation {
+    // For ALL_STUDENTS, studentIds should be null (dynamic query at runtime)
+    // For SPECIFIC_STUDENTS, studentIds should be the explicit list
+    let studentIds: string[] | null = null;
+
+    if (response.distributionType === 'SPECIFIC_STUDENTS') {
+      // Only set studentIds for SPECIFIC_STUDENTS
+      if (response.studentIds && response.studentIds.length > 0) {
+        studentIds = response.studentIds.map(id => String(id));
+      } else {
+        studentIds = []; // Empty list means no students selected
+      }
+    }
+    // For ALL_STUDENTS, keep studentIds as null (will be resolved dynamically)
+
+    return {
+      id: response.id ? String(response.id) : `local-${Date.now()}`,
+      assignmentId,
+      courseId,
+      distributionType: response.distributionType,
+      studentIds,
+      classId: response.classId,
+      createdBy,
+      createdAt: response.createdAt || new Date().toISOString(),
+      isIndividual: response.isIndividual
+    };
+  }
+
+  /**
+   * Get allocation for an assignment (from cache)
+   */
+  getAllocation(assignmentId: string): AssignmentAllocation | undefined {
+    return this.allocations().find((a) => a.assignmentId === assignmentId);
+  }
+
+  /**
+   * Load allocation from API
+   */
+  loadAllocation(assignmentId: string, courseId: string): Observable<AssignmentAllocation | null> {
+    return this.allocationApi.getAllocation(assignmentId).pipe(
+      map(response => {
+        if (response.data) {
+          const allocation = this.mapResponseToAllocation(response.data, assignmentId, courseId, 'unknown');
+          this.allocations.update(current => {
+            const filtered = current.filter(a => a.assignmentId !== assignmentId);
+            return [...filtered, allocation];
+          });
+          return allocation;
+        }
+        return null;
+      }),
+      catchError(() => {
+        return of(null);
+      })
+    );
+  }
+
+  /**
+   * Get all allocated students for an assignment
+   */
+  getAllocatedStudents(
+    assignmentId: string,
+    enrolledStudents: EnrolledStudent[]
+  ): string[] {
+    const allocation = this.getAllocation(assignmentId);
+    if (!allocation) return [];
+
+    return getAllocatedStudents(allocation, enrolledStudents);
+  }
+
+  /**
+   * Check if a student is allocated to an assignment
+   */
+  isStudentAllocated(
+    studentId: string,
+    assignmentId: string,
+    enrolledStudents: EnrolledStudent[]
+  ): boolean {
+    const allocation = this.getAllocation(assignmentId);
+    if (!allocation) return false;
+
+    const result = isStudentAllocated(studentId, allocation, enrolledStudents);
+    return result.isAllocated;
+  }
+
+  /**
+   * Get allocation statistics for an assignment
+   */
+  getAllocationStats(
+    assignmentId: string,
+    enrolledStudents: EnrolledStudent[]
+  ): { totalAllocated: number; distributionType: DistributionType; isIndividual: boolean } | null {
+    const allocation = this.getAllocation(assignmentId);
+    if (!allocation) return null;
+
+    return getAllocationStats(allocation, enrolledStudents);
+  }
+
+  /**
+   * Get all tasks for a student (with full data)
+   */
+  getStudentTasksWithData(
+    studentId: string,
+    assignments: Array<{
+      id: string;
+      title: string;
+      courseId: string;
+      courseTitle: string;
+      dueDate: string;
+      maxScore: number;
+    }>,
+    submissions: Array<{
+      assignmentId: string;
+      id: string;
+      status: 'PENDING' | 'SUBMITTED' | 'GRADED';
+      submittedAt?: string;
+      grade?: number;
+    }>,
+    enrolledStudents: EnrolledStudent[]
+  ): StudentTask[] {
+    const tasks: StudentTask[] = [];
+    const overrides = this.deadlineOverrides();
+
+    for (const assignment of assignments) {
+      // Check if student is allocated to this assignment
+      if (!this.isStudentAllocated(studentId, assignment.id, enrolledStudents)) {
+        continue;
+      }
+
+      // Find submission for this assignment
+      const submission = submissions.find(
+        (s) => s.assignmentId === assignment.id
+      );
+
+      // Get effective deadline (with override if exists)
+      const personalDeadline = getEffectiveDeadline(
+        assignment.dueDate,
+        overrides,
+        studentId,
+        assignment.id
+      );
+
+      // Calculate status
+      const status = calculateTaskStatus(
+        submission
+          ? {
+            id: submission.id,
+            assignmentId: submission.assignmentId,
+            status: submission.status,
+            grade: submission.grade,
+          }
+          : null,
+        assignment.dueDate,
+        personalDeadline !== assignment.dueDate ? personalDeadline : undefined
+      );
+
+      // Check if overdue
+      const isOverdue =
+        status === 'OVERDUE' ||
+        (status === 'NOT_STARTED' &&
+          new Date() > new Date(personalDeadline || assignment.dueDate));
+
+      // Get allocation to check if individual
+      const allocation = this.getAllocation(assignment.id);
+
+      tasks.push({
+        assignmentId: assignment.id,
+        assignmentTitle: assignment.title,
+        courseId: assignment.courseId,
+        courseTitle: assignment.courseTitle,
+        dueDate: assignment.dueDate,
+        personalDeadline:
+          personalDeadline !== assignment.dueDate ? personalDeadline : undefined,
+        status,
+        submissionId: submission?.id,
+        submittedAt: submission?.submittedAt,
+        grade: submission?.grade,
+        maxScore: assignment.maxScore,
+        isOverdue,
+        isIndividual: allocation?.isIndividual,
+      });
+    }
+
+    return sortTasksByDueDate(tasks);
+  }
+
+  /**
+   * Get tasks grouped by status for Kanban view
+   */
+  getGroupedTasks(tasks: StudentTask[]): {
+    toDo: StudentTask[];
+    inProgress: StudentTask[];
+    completed: StudentTask[];
+  } {
+    return groupTasksByStatus(tasks);
+  }
+
+  /**
+   * Extend deadline for a specific student (using real API)
+   */
+  extendDeadline(
+    assignmentId: string,
+    studentId: string,
+    newDeadline: string,
+    reason: string
+  ): Observable<DeadlineOverride> {
+    this.loading.set(true);
+
+    const override: DeadlineOverride = {
+      assignmentId,
+      studentId,
+      newDeadline,
+    };
+
+    return this.allocationApi.updateStudentDeadline(assignmentId, studentId, { newDeadline }).pipe(
+      map(() => {
+        // Remove existing override if any
+        this.deadlineOverrides.update((current) =>
+          current.filter(
+            (o) =>
+              !(o.assignmentId === assignmentId && o.studentId === studentId)
+          )
+        );
+        // Add new override
+        this.deadlineOverrides.update((current) => [...current, override]);
+        this.loading.set(false);
+        return override;
+      }),
+      catchError(err => {
+        this.error.set('Không thể gia hạn deadline');
+        this.loading.set(false);
+        // Still update local state for UX
+        this.deadlineOverrides.update((current) => [...current, override]);
+        return of(override);
+      })
+    );
+  }
+
+  /**
+   * Get deadline override for a student
+   */
+  getDeadlineOverride(
+    assignmentId: string,
+    studentId: string
+  ): DeadlineOverride | undefined {
+    return this.deadlineOverrides().find(
+      (o) => o.assignmentId === assignmentId && o.studentId === studentId
+    );
+  }
+
+  /**
+   * Clear all state (for logout/cleanup)
+   */
+  clearState(): void {
+    this.allocations.set([]);
+    this.deadlineOverrides.set([]);
+    this.loading.set(false);
+    this.error.set(null);
+  }
+
+  /**
+   * Get student tasks (simplified version for StudentAssignmentsComponent)
+   */
+  getStudentTasks(studentId: string): Observable<StudentTask[]> {
+    this.loading.set(true);
+
+    return this.apiClient.get<any>(`/api/v3/teacher/students/${studentId}/assignments`).pipe(
+      map((response: any) => {
+        const items = response?.data || [];
+        return items.map((item: any) => ({
+          id: item.id,
+          assignmentId: item.assignmentId || item.id,
+          title: item.title,
+          courseId: item.courseId || '',
+          courseName: item.courseName || '',
+          dueDate: item.dueDate || new Date().toISOString(),
+          status: this.mapBackendStatus(item.status),
+          submittedAt: item.submittedAt,
+          grade: item.grade,
+          maxScore: item.maxGrade || 100,
+          feedback: item.feedback,
+          isIndividual: false,
+        } as StudentTask));
+      }),
+      tap(() => this.loading.set(false)),
+      catchError(() => {
+        this.loading.set(false);
+        return of([]);
+      })
+    );
+  }
+
+  private mapBackendStatus(status: string): TaskStatus {
+    switch (status?.toUpperCase()) {
+      case 'GRADED': return 'GRADED';
+      case 'SUBMITTED':
+      case 'RESUBMITTED':
+      case 'LATE': return 'SUBMITTED';
+      case 'NOT_SUBMITTED': return 'NOT_STARTED';
+      default: return 'NOT_STARTED';
+    }
+  }
+
+  /**
+   * Get available assignments for a student (for AssignTaskModal)
+   * @requirements 2.2
+   */
+  getAvailableAssignments(studentId: string): Observable<{
+    assignments: Array<{
+      id: string;
+      title: string;
+      courseId: string;
+      courseTitle: string;
+      dueDate: string | null;
+      maxScore: number;
+      status: 'DRAFT' | 'PUBLISHED' | 'CLOSED';
+      alreadyAssigned: boolean;
+    }>;
+    courses: Array<{ id: string; title: string }>;
+  }> {
+    this.loading.set(true);
+
+    return this.assignmentApi.getTeacherAssignments({ status: 'PUBLISHED' }).pipe(
+      map(response => {
+        const assignments = (response.data || []).map((a: any) => ({
+          id: a.id,
+          title: a.title,
+          courseId: a.courseId || '',
+          courseTitle: a.courseTitle || '',
+          dueDate: a.dueDate || null,
+          maxScore: a.maxScore || 100,
+          status: a.status || 'PUBLISHED',
+          alreadyAssigned: false
+        }));
+        const courseMap = new Map<string, string>();
+        assignments.forEach((a: any) => {
+          if (a.courseId && a.courseTitle) courseMap.set(a.courseId, a.courseTitle);
+        });
+        const courses = Array.from(courseMap.entries()).map(([id, title]) => ({ id, title }));
+        return { assignments, courses };
+      }),
+      tap(() => this.loading.set(false)),
+      catchError(() => {
+        this.loading.set(false);
+        return of({ assignments: [] as any[], courses: [] as any[] });
+      })
+    );
+  }
+
+  /**
+   * Assign individual task to a student (using real API)
+   * @requirements 2.2, 2.3
+   */
+  assignIndividualTask(
+    assignmentId: string,
+    studentId: string,
+    customDeadline?: string,
+    note?: string
+  ): Observable<AssignmentAllocation> {
+    this.loading.set(true);
+
+    return this.allocationApi.assignIndividual(assignmentId, {
+      studentId,
+      customDeadline,
+      note
+    }).pipe(
+      map(response => {
+        const allocation = this.mapResponseToAllocation(
+          response.data!,
+          assignmentId,
+          '', // courseId will be fetched from assignment
+          'current-teacher'
+        );
+
+        // Update local state
+        this.allocations.update(current => {
+          const filtered = current.filter(a => a.assignmentId !== assignmentId);
+          return [...filtered, allocation];
+        });
+
+        // If custom deadline, create override
+        if (customDeadline) {
+          const override: DeadlineOverride = {
+            assignmentId,
+            studentId,
+            newDeadline: customDeadline
+          };
+          this.deadlineOverrides.update(current => [...current, override]);
+        }
+
+        this.loading.set(false);
+        return allocation;
+      }),
+      catchError(err => {
+        this.error.set('Không thể giao bài tập riêng');
+        this.loading.set(false);
+        return throwError(() => err);
+      })
+    );
+  }
+
+  /**
+   * Remove individual assignment from a student (using real API)
+   * @requirements 2.4
+   */
+  removeIndividualAssignment(
+    assignmentId: string,
+    studentId: string
+  ): Observable<void> {
+    this.loading.set(true);
+
+    return this.allocationApi.removeStudentFromAllocation(assignmentId, studentId).pipe(
+      map(() => {
+        // Remove from local allocation
+        this.allocations.update(current => {
+          return current.map(a => {
+            if (a.assignmentId === assignmentId && a.studentIds) {
+              return {
+                ...a,
+                studentIds: a.studentIds.filter(id => id !== studentId)
+              };
+            }
+            return a;
+          });
+        });
+        // Remove deadline override if exists
+        this.deadlineOverrides.update(current =>
+          current.filter(o =>
+            !(o.assignmentId === assignmentId && o.studentId === studentId)
+          )
+        );
+        this.loading.set(false);
+      }),
+      catchError(err => {
+        this.error.set('Không thể xóa học viên khỏi danh sách');
+        this.loading.set(false);
+        return of(undefined);
+      })
+    );
+  }
+}

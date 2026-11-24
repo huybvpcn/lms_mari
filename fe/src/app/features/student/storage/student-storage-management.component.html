@@ -1,0 +1,677 @@
+<div class="min-h-screen bg-slate-50">
+  <div class="mx-auto max-w-[1400px] px-4 sm:px-6 py-6 space-y-6">
+
+    <!-- Page Header -->
+    <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900">Lưu trữ ngoại tuyến</h1>
+        <p class="mt-1 text-sm text-gray-500">
+          Quản lý khóa học đã tải xuống thiết bị này. Dữ liệu được lưu trong bộ nhớ trình duyệt — bạn có thể học ngay cả khi không có mạng.
+        </p>
+      </div>
+      <div class="inline-flex items-center gap-2 self-start rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 shadow-sm">
+        <span class="inline-block h-2.5 w-2.5 rounded-full"
+              [class.bg-emerald-500]="network.online()"
+              [class.bg-red-500]="!network.online()"></span>
+        {{ currentConnectionLabel() }}
+      </div>
+    </div>
+
+    <!-- Alerts (Recovery / Storage Warning) — collapsed into single zone -->
+    @if (offlineRecoveryCard(); as recoveryCard) {
+      <div
+        class="rounded-lg border p-4 shadow-sm"
+        [class.border-red-200]="recoveryCard.tone === 'red'"
+        [class.bg-red-50]="recoveryCard.tone === 'red'"
+        [class.text-red-800]="recoveryCard.tone === 'red'"
+        [class.border-amber-200]="recoveryCard.tone === 'amber'"
+        [class.bg-amber-50]="recoveryCard.tone === 'amber'"
+        [class.text-amber-800]="recoveryCard.tone === 'amber'"
+        [class.border-blue-200]="recoveryCard.tone === 'blue'"
+        [class.bg-blue-50]="recoveryCard.tone === 'blue'"
+        [class.text-blue-800]="recoveryCard.tone === 'blue'">
+        <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <p class="font-semibold">{{ recoveryCard.title }}</p>
+            <p class="mt-1 text-sm"
+               [class.text-red-700]="recoveryCard.tone === 'red'"
+               [class.text-amber-700]="recoveryCard.tone === 'amber'"
+               [class.text-blue-700]="recoveryCard.tone === 'blue'">
+              {{ recoveryCard.description }}
+            </p>
+          </div>
+          <button
+            type="button"
+            (click)="onRecoveryAction()"
+            class="rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors"
+            [class.bg-red-600]="recoveryCard.tone === 'red'"
+            [class.hover:bg-red-700]="recoveryCard.tone === 'red'"
+            [class.bg-amber-600]="recoveryCard.tone === 'amber'"
+            [class.hover:bg-amber-700]="recoveryCard.tone === 'amber'"
+            [class.bg-[#0056D2]]="recoveryCard.tone === 'blue'"
+            [class.hover:bg-[#004BB5]]="recoveryCard.tone === 'blue'">
+            {{ recoveryCard.actionLabel }}
+          </button>
+        </div>
+      </div>
+    }
+
+    @if (storagePercent() >= 95) {
+      <div class="rounded-lg border border-red-200 bg-red-50 p-4 text-red-800">
+        <p class="font-semibold">Bộ nhớ gần đầy ({{ storagePercent() | number:'1.0-0' }}%)</p>
+        <p class="mt-1 text-sm text-red-700">Hãy xóa bớt dữ liệu hoặc giảm chất lượng video mặc định.</p>
+      </div>
+    } @else if (storagePercent() >= 80) {
+      <div class="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-800">
+        <p class="font-semibold">Dung lượng đang ở mức cao ({{ storagePercent() | number:'1.0-0' }}%)</p>
+        <p class="mt-1 text-sm text-amber-700">Bạn nên dọn các khóa học đã hoàn thành hoặc giảm chất lượng video.</p>
+      </div>
+    }
+
+    <!-- Tab Chips -->
+    <div class="flex gap-2 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 sm:overflow-visible" role="tablist">
+      <button class="inline-flex items-center whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium border transition-all"
+              [class.bg-[#0056D2]]="activeTab() === 'overview'"
+              [class.text-white]="activeTab() === 'overview'"
+              [class.border-[#0056D2]]="activeTab() === 'overview'"
+              [class.bg-white]="activeTab() !== 'overview'"
+              [class.text-gray-700]="activeTab() !== 'overview'"
+              [class.border-gray-200]="activeTab() !== 'overview'"
+              [class.hover:border-gray-300]="activeTab() !== 'overview'"
+              (click)="activeTab.set('overview')"
+              role="tab" [attr.aria-selected]="activeTab() === 'overview'" type="button">
+        Tổng quan
+      </button>
+      <button class="inline-flex items-center whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium border transition-all"
+              [class.bg-[#0056D2]]="activeTab() === 'courses'"
+              [class.text-white]="activeTab() === 'courses'"
+              [class.border-[#0056D2]]="activeTab() === 'courses'"
+              [class.bg-white]="activeTab() !== 'courses'"
+              [class.text-gray-700]="activeTab() !== 'courses'"
+              [class.border-gray-200]="activeTab() !== 'courses'"
+              [class.hover:border-gray-300]="activeTab() !== 'courses'"
+              (click)="activeTab.set('courses')"
+              role="tab" [attr.aria-selected]="activeTab() === 'courses'" type="button">
+        Khóa học ({{ downloadService.downloadedCount() }})
+      </button>
+      <button class="inline-flex items-center whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium border transition-all"
+              [class.bg-[#0056D2]]="activeTab() === 'settings'"
+              [class.text-white]="activeTab() === 'settings'"
+              [class.border-[#0056D2]]="activeTab() === 'settings'"
+              [class.bg-white]="activeTab() !== 'settings'"
+              [class.text-gray-700]="activeTab() !== 'settings'"
+              [class.border-gray-200]="activeTab() !== 'settings'"
+              [class.hover:border-gray-300]="activeTab() !== 'settings'"
+              (click)="activeTab.set('settings')"
+              role="tab" [attr.aria-selected]="activeTab() === 'settings'" type="button">
+        Cài đặt
+      </button>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- TAB: Tổng quan                              -->
+    <!-- ═══════════════════════════════════════════ -->
+    @if (activeTab() === 'overview') {
+      @if (isLoading()) {
+        <!-- Loading Skeleton -->
+        <div class="space-y-6">
+          <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm animate-pulse">
+            <div class="flex items-center justify-between">
+              <div class="space-y-2">
+                <div class="h-5 w-24 rounded bg-gray-200"></div>
+                <div class="h-4 w-48 rounded bg-gray-100"></div>
+              </div>
+              <div class="h-4 w-28 rounded bg-gray-100"></div>
+            </div>
+            <div class="mt-4 h-4 rounded-full bg-gray-100"></div>
+            <div class="mt-4 grid gap-3 grid-cols-2 xl:grid-cols-3">
+              @for (_ of [1,2,3,4,5,6]; track $index) {
+                <div class="rounded-lg bg-slate-50 px-3 py-3">
+                  <div class="h-3 w-20 rounded bg-gray-200"></div>
+                  <div class="mt-2 h-5 w-16 rounded bg-gray-200"></div>
+                </div>
+              }
+            </div>
+          </div>
+          <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm animate-pulse">
+            <div class="space-y-2">
+              <div class="h-5 w-32 rounded bg-gray-200"></div>
+              <div class="h-4 w-56 rounded bg-gray-100"></div>
+            </div>
+            <div class="mt-4 grid gap-3 grid-cols-2 sm:grid-cols-4">
+              @for (_ of [1,2,3,4]; track $index) {
+                <div class="rounded-lg bg-slate-50 px-3 py-3">
+                  <div class="h-3 w-14 rounded bg-gray-200"></div>
+                  <div class="mt-3 h-6 w-8 rounded bg-gray-200"></div>
+                  <div class="mt-2 h-2 w-24 rounded bg-gray-100"></div>
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+      } @else {
+      <!-- Storage Overview Card -->
+      <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <h2 class="text-base font-semibold text-gray-900">Dung lượng</h2>
+            <p class="mt-1 text-sm text-gray-500">Phân bổ bộ nhớ trên thiết bị này.</p>
+          </div>
+          <span class="text-sm text-gray-500">
+            {{ storageManager.formatBytes(estimate().usedBytes) }} / {{ storageManager.formatBytes(estimate().quotaBytes) }}
+          </span>
+        </div>
+
+        <div class="mt-4 h-4 overflow-hidden rounded-full bg-gray-100">
+          <div class="flex h-full w-full" [style.max-width.%]="storagePercent()">
+            @if (courseBarPercent() > 0) {
+              <div class="h-full bg-[#0056D2] transition-all duration-300" [style.flex-grow]="totalCourseBytes()"></div>
+            }
+            @if (videoBarPercent() > 0) {
+              <div class="h-full bg-emerald-500 transition-all duration-300" [style.flex-grow]="totalVideoBytes()"></div>
+            }
+            @if (fileBarPercent() > 0) {
+              <div class="h-full bg-violet-500 transition-all duration-300" [style.flex-grow]="totalFileBytes()"></div>
+            }
+            @if (systemBarPercent() > 0) {
+              <div class="h-full bg-gray-400 transition-all duration-300" [style.flex-grow]="systemOverheadBytes()"></div>
+            }
+          </div>
+        </div>
+
+        <div class="mt-4 grid gap-3 grid-cols-2 xl:grid-cols-3">
+          <div class="rounded-lg bg-slate-50 px-3 py-3 text-sm">
+            <p class="text-gray-500">Nội dung học</p>
+            <p class="mt-1 font-semibold text-gray-900">{{ storageManager.formatBytes(totalCourseBytes()) }}</p>
+          </div>
+          <div class="rounded-lg bg-slate-50 px-3 py-3 text-sm">
+            <p class="text-gray-500">Video đã tải</p>
+            <p class="mt-1 font-semibold text-gray-900">{{ storageManager.formatBytes(totalVideoBytes()) }}</p>
+          </div>
+          @if (totalFileBytes() > 0) {
+            <div class="rounded-lg bg-slate-50 px-3 py-3 text-sm">
+              <p class="text-gray-500">Tệp đính kèm</p>
+              <p class="mt-1 font-semibold text-gray-900">{{ storageManager.formatBytes(totalFileBytes()) }}</p>
+            </div>
+          }
+          <div class="rounded-lg bg-slate-50 px-3 py-3 text-sm">
+            <p class="text-gray-500">Bộ nhớ đệm</p>
+            <p class="mt-1 font-semibold text-gray-900">{{ storageManager.formatBytes(systemOverheadBytes()) }}</p>
+            <p class="mt-0.5 text-[10px] text-gray-400">Dữ liệu tạm giúp ứng dụng tải nhanh hơn</p>
+          </div>
+          <div class="rounded-lg bg-slate-50 px-3 py-3 text-sm">
+            <p class="text-gray-500">Đồng bộ</p>
+            @if (syncService.pendingCount() + syncService.failedCount() > 0) {
+              <p class="mt-1 font-semibold text-gray-900">{{ syncService.pendingCount() + syncService.failedCount() }} mục chờ</p>
+            } @else {
+              <p class="mt-1 font-semibold text-emerald-600">Đã đồng bộ</p>
+            }
+          </div>
+          <div class="rounded-lg bg-slate-50 px-3 py-3 text-sm">
+            <p class="text-gray-500">Còn trống</p>
+            <p class="mt-1 font-semibold text-gray-900">{{ storageManager.formatBytes(freeBytes()) }}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sync Status Card -->
+      <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+        <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <h2 class="text-base font-semibold text-gray-900">Trạng thái đồng bộ</h2>
+            <p class="mt-1 text-sm text-gray-500">{{ syncStatusLabel() }}</p>
+            @if (syncConflictSummary()) {
+              <p class="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                {{ syncConflictSummary() }}
+              </p>
+            }
+            @if (lastManualSyncDate()) {
+              <p class="mt-2 text-xs text-gray-400">
+                Đồng bộ thủ công gần nhất: {{ lastManualSyncDate() | date:'dd/MM/yyyy HH:mm' }}
+              </p>
+            }
+            @if (syncService.earliestRetryAt()) {
+              <p class="mt-1 text-xs text-gray-400">Lần thử lại sớm nhất sau {{ retryCountdownLabel() }}</p>
+            }
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button
+              type="button"
+              (click)="onSyncNow()"
+              [disabled]="!network.online() || syncService.isSyncing()"
+              class="rounded-lg bg-[#0056D2] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#004BB5] disabled:cursor-not-allowed disabled:bg-gray-300">
+              @if (syncService.isSyncing()) {
+                Đang đồng bộ...
+              } @else {
+                Đồng bộ ngay
+              }
+            </button>
+            @if (syncService.hasFailedItems()) {
+              <button type="button" (click)="onRetryFailed()"
+                class="rounded-lg bg-amber-50 px-4 py-2 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-100">
+                Thử lại mục lỗi
+              </button>
+              <button type="button" (click)="onClearFailed()"
+                class="rounded-lg bg-red-50 px-4 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-100">
+                Xóa mục lỗi
+              </button>
+            }
+            @if (syncService.hasConflictItems()) {
+              <button type="button" (click)="onResolveConflicts()"
+                class="rounded-lg bg-amber-100 px-4 py-2 text-sm font-medium text-amber-800 transition-colors hover:bg-amber-200">
+                {{ syncConflictActionLabel() }}
+              </button>
+            }
+          </div>
+        </div>
+
+        <div class="mt-4 grid gap-3 grid-cols-2 sm:grid-cols-4">
+          <div class="rounded-lg bg-slate-50 px-3 py-3">
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-400">Đang chờ</p>
+            <p class="mt-2 text-xl font-semibold text-gray-900">{{ syncService.pendingCount() }}</p>
+            @if (syncService.pendingCount() > 0) {
+              <p class="mt-1 text-[10px] text-gray-400">Bài làm chưa gửi lên hệ thống</p>
+            } @else {
+              <p class="mt-1 text-[10px] text-emerald-500">Không có mục chờ gửi</p>
+            }
+          </div>
+          <div class="rounded-lg bg-slate-50 px-3 py-3">
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-400">Thất bại</p>
+            <p class="mt-2 text-xl font-semibold text-gray-900">{{ syncService.failedCount() }}</p>
+            @if (syncService.failedCount() > 0) {
+              <p class="mt-1 text-[10px] text-red-400">Gửi lỗi, cần thử lại</p>
+            } @else {
+              <p class="mt-1 text-[10px] text-gray-400">Không có lỗi</p>
+            }
+          </div>
+          <div class="rounded-lg px-3 py-3"
+               [class.bg-amber-50]="syncService.conflictCount() > 0"
+               [class.bg-slate-50]="syncService.conflictCount() === 0">
+            <p class="text-xs font-medium uppercase tracking-wide"
+               [class.text-amber-700]="syncService.conflictCount() > 0"
+               [class.text-gray-400]="syncService.conflictCount() === 0">Xung đột</p>
+            <p class="mt-2 text-xl font-semibold"
+               [class.text-amber-900]="syncService.conflictCount() > 0"
+               [class.text-gray-900]="syncService.conflictCount() === 0">{{ syncService.conflictCount() }}</p>
+            @if (syncService.conflictCount() > 0) {
+              <p class="mt-1 text-[10px] text-amber-600">Cần kiểm tra trước khi đồng bộ</p>
+            } @else {
+              <p class="mt-1 text-[10px] text-gray-400">Không có xung đột</p>
+            }
+          </div>
+          <div class="rounded-lg bg-slate-50 px-3 py-3">
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-400">Tự đồng bộ</p>
+            <p class="mt-2 text-sm font-semibold text-gray-900">
+              {{ offlineSettings.autoSyncWhenOnline() ? 'Đang bật' : 'Đã tắt' }}
+            </p>
+            <p class="mt-1 text-[10px] text-gray-400">Tự gửi khi có mạng</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stale Courses Warning -->
+      @if (staleSummary()) {
+        <div class="rounded-lg border border-amber-200 bg-amber-50 p-5 shadow-sm">
+          <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div>
+              <h2 class="text-base font-semibold text-amber-900">Khóa học cần cập nhật</h2>
+              <p class="mt-1 text-sm text-amber-800">{{ staleSummary() }}</p>
+              <p class="mt-2 text-xs text-amber-700">
+                Bạn vẫn có thể xem nội dung đã tải, nhưng bài kiểm tra trực tuyến sẽ bị khóa cho tới khi cập nhật.
+              </p>
+            </div>
+            @if (downloadService.isBulkUpdating()) {
+              <span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800">
+                Đang cập nhật {{ downloadService.bulkUpdateProgress().current }}/{{ downloadService.bulkUpdateProgress().total }}
+              </span>
+            } @else {
+              <button type="button" (click)="onBulkUpdateStale()"
+                class="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-700">
+                Cập nhật tất cả
+              </button>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- Quick Cleanup Suggestion -->
+      @if (storagePercent() >= 80 && completedCourseBytes() > 0) {
+        <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
+          <h2 class="text-base font-semibold text-emerald-900">Gợi ý dọn dẹp nhanh</h2>
+          <p class="mt-2 text-sm text-emerald-800">
+            {{ completedCourseCount() }} khóa học đã hoàn thành đang chiếm {{ storageManager.formatBytes(completedCourseBytes()) }}.
+          </p>
+          <button type="button" (click)="onDeleteCompletedCourses()"
+            class="mt-4 rounded-lg bg-white px-4 py-2 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100">
+            Xóa các khóa đã hoàn thành
+          </button>
+        </div>
+      }
+      } <!-- end @else (loading) -->
+    }
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- TAB: Khóa học đã tải                        -->
+    <!-- ═══════════════════════════════════════════ -->
+    @if (activeTab() === 'courses') {
+      <!-- Downloaded Courses (full width) -->
+      <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+        <div class="flex items-center justify-between gap-3 mb-4">
+          <h2 class="text-base font-semibold text-gray-900">Khóa học đã tải</h2>
+          <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+            {{ downloadService.downloadedCount() }}
+          </span>
+        </div>
+
+        @if (downloadService.downloadedCourses().length === 0) {
+          <div class="py-12 text-center">
+            <svg class="mx-auto h-12 w-12 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+            </svg>
+            <p class="mt-3 text-sm font-medium text-gray-600">Chưa có khóa học nào được tải xuống</p>
+            <p class="mt-1 text-xs text-gray-400">Hãy vào trang khóa học và chọn tải về để dùng ngoại tuyến.</p>
+          </div>
+        } @else {
+          <div class="space-y-3">
+            @for (course of visibleCourses(); track course.id) {
+              <div class="rounded-lg border p-4 transition-colors"
+                   [class.border-amber-200]="course.isStale"
+                   [class.bg-amber-50/60]="course.isStale"
+                   [class.border-emerald-200]="!course.isStale && course.completionPercent === 100"
+                   [class.bg-emerald-50/50]="!course.isStale && course.completionPercent === 100"
+                   [class.border-gray-200]="!course.isStale && course.completionPercent !== 100">
+                <div class="flex items-start justify-between gap-3">
+                  <div class="min-w-0">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <p class="truncate font-medium text-gray-900">{{ course.title }}</p>
+                      @if (course.isStale) {
+                        <span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">Bản cũ</span>
+                      } @else if (course.completionPercent === 100) {
+                        <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">Hoàn thành</span>
+                      }
+                    </div>
+                    <div class="mt-2 flex flex-wrap gap-3 text-xs text-gray-500">
+                      <span>{{ course.totalLessons }} bài học</span>
+                      <span>{{ storageManager.formatBytes(course.sizeBytes) }}</span>
+                      @if (course.downloadedAt) {
+                        <span>{{ course.downloadedAt | date:'dd/MM/yyyy' }}</span>
+                      }
+                      @if (course.completionPercent > 0 && course.completionPercent < 100) {
+                        <span class="font-medium text-[#0056D2]">{{ course.completionPercent }}% hoàn thành</span>
+                      }
+                    </div>
+                  </div>
+                  <button type="button" (click)="onDeleteCourse(course)"
+                    class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                    title="Xóa khóa học">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                    </svg>
+                  </button>
+                </div>
+                @if (course.isStale) {
+                  <p class="mt-3 text-xs text-amber-800">{{ getStaleReasonDescription(course) }}</p>
+                  <button type="button" (click)="onRedownloadCourse(course)" [disabled]="downloadService.isBulkUpdating()"
+                    class="mt-3 rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50">
+                    {{ getStaleActionLabel(course) }}
+                  </button>
+                }
+              </div>
+            }
+          </div>
+
+          <!-- Load More -->
+          @if (hasMoreCourses()) {
+            <div class="mt-4 text-center">
+              <button type="button" (click)="showMoreCourses()"
+                class="rounded-lg border border-gray-200 bg-white px-5 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50">
+                Hiện thêm (còn {{ remainingCoursesCount() }} khóa học)
+              </button>
+              <p class="mt-2 text-xs text-gray-400">
+                Đang hiện {{ visibleCourses().length }} / {{ downloadService.downloadedCount() }} khóa học
+              </p>
+            </div>
+          }
+        }
+      </div>
+
+      <!-- Offline Videos — grouped by course → lesson -->
+      <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+        <div class="flex items-center justify-between gap-3 mb-4">
+          <h2 class="text-base font-semibold text-gray-900">Video ngoại tuyến</h2>
+          <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+            {{ totalOfflineVideoCount() }}
+          </span>
+        </div>
+
+        @if (totalOfflineVideoCount() === 0) {
+          <div class="py-12 text-center">
+            <svg class="mx-auto h-12 w-12 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z" />
+            </svg>
+            <p class="mt-3 text-sm font-medium text-gray-600">Chưa có video ngoại tuyến nào</p>
+            <p class="mt-1 text-xs text-gray-400">Video nội bộ sẽ xuất hiện ở đây khi bạn tải khóa học có video.</p>
+          </div>
+        } @else {
+          <div class="space-y-5">
+            @for (courseGroup of groupedOfflineVideosByCourse(); track courseGroup.courseId) {
+              <!-- Course header -->
+              <div>
+                <div class="flex items-center justify-between gap-3 mb-3">
+                  <div class="min-w-0">
+                    <p class="font-semibold text-gray-900 truncate">{{ courseGroup.courseTitle }}</p>
+                    <p class="mt-0.5 text-xs text-gray-500">
+                      {{ courseGroup.totalVideoCount }} video · {{ storageManager.formatBytes(courseGroup.totalSizeBytes) }}
+                    </p>
+                  </div>
+                </div>
+
+                <!-- Lessons within this course -->
+                <div class="space-y-2 pl-3 border-l-2 border-gray-100">
+                  @for (lesson of courseGroup.lessons; track lesson.lessonId) {
+                    <div class="rounded-lg border border-gray-200 bg-slate-50/60 p-3">
+                      <p class="text-sm font-medium text-gray-700 truncate">{{ lesson.lessonTitle }}</p>
+                      <div class="mt-2 space-y-2">
+                        @for (video of lesson.items; track video.cacheKey) {
+                          <div class="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 border border-gray-100">
+                            <div class="min-w-0 flex-1">
+                              <p class="text-sm text-gray-900 truncate">{{ video.sectionTitle || video.title }}</p>
+                              <div class="mt-1 flex flex-wrap gap-2 text-xs text-gray-400">
+                                <span>{{ storageManager.formatBytes(video.sizeBytes) }}</span>
+                                @if (getDownloadedVideoProfileBadge(video); as profileBadge) {
+                                  <span class="font-medium text-slate-600">{{ profileBadge }}</span>
+                                }
+                              </div>
+                            </div>
+                            <button type="button" (click)="onDeleteVideo(video)"
+                              class="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                              title="Xóa video">
+                              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                              </svg>
+                            </button>
+                          </div>
+                        }
+                      </div>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    }
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- TAB: Cài đặt                               -->
+    <!-- ═══════════════════════════════════════════ -->
+    @if (activeTab() === 'settings') {
+      <!-- Device Settings -->
+      <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <h2 class="text-base font-semibold text-gray-900">Thiết lập ngoại tuyến</h2>
+            <p class="mt-1 text-sm text-gray-500">Các thiết lập này chỉ áp dụng cho thiết bị hiện tại.</p>
+          </div>
+          <span class="rounded-full bg-[#0056D2]/10 px-2.5 py-1 text-xs font-medium text-[#0056D2]">
+            Thiết bị này
+          </span>
+        </div>
+
+        <div class="mt-5 space-y-5">
+          <!-- Video Quality -->
+          <div>
+            <h3 class="text-sm font-semibold text-gray-900">Chất lượng video mặc định</h3>
+            <p class="mt-1 text-sm text-gray-500">
+              Áp dụng cho lượt tải mới. Chất lượng hiện tại:
+              <span class="font-medium text-gray-700">{{ getDefaultVideoQualityLabel(deviceSettings().defaultVideoQuality) }}</span>
+            </p>
+            <div class="mt-3 grid gap-3 md:grid-cols-2">
+              @for (option of qualityOptions; track option.value) {
+                <button
+                  type="button"
+                  (click)="onSelectDefaultQuality(option.value)"
+                  class="rounded-lg border p-4 text-left transition-colors"
+                  [class.border-[#0056D2]]="deviceSettings().defaultVideoQuality === option.value"
+                  [class.bg-[#0056D2]/5]="deviceSettings().defaultVideoQuality === option.value"
+                  [class.border-gray-200]="deviceSettings().defaultVideoQuality !== option.value"
+                  [class.hover:border-gray-300]="deviceSettings().defaultVideoQuality !== option.value">
+                  <div class="flex items-center justify-between gap-3">
+                    <p class="font-medium text-gray-900">{{ option.label }}</p>
+                    @if (deviceSettings().defaultVideoQuality === option.value) {
+                      <span class="rounded-full bg-[#0056D2] px-2 py-0.5 text-xs font-medium text-white">Đang dùng</span>
+                    }
+                  </div>
+                  <p class="mt-2 text-sm text-gray-500">{{ option.hint }}</p>
+                </button>
+              }
+            </div>
+          </div>
+
+          <!-- Toggles -->
+          <div class="grid gap-4 md:grid-cols-2">
+            <div class="rounded-lg border border-gray-200 p-4">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <h3 class="text-sm font-semibold text-gray-900">Chỉ tải khi có Wi-Fi</h3>
+                  <p class="mt-1 text-sm text-gray-500">Hạn chế tải trên dữ liệu di động.</p>
+                </div>
+                <button
+                  type="button"
+                  (click)="onToggleWifiOnly()"
+                  class="inline-flex h-6 w-11 items-center rounded-full transition-colors"
+                  [class.bg-[#0056D2]]="offlineSettings.downloadOnWifiOnly()"
+                  [class.bg-gray-300]="!offlineSettings.downloadOnWifiOnly()">
+                  <span class="ml-0.5 inline-block h-5 w-5 rounded-full bg-white shadow transition-transform"
+                        [class.translate-x-5]="offlineSettings.downloadOnWifiOnly()"></span>
+                </button>
+              </div>
+              <p class="mt-3 text-xs text-gray-500">{{ wifiPolicyHint() }}</p>
+            </div>
+
+            <div class="rounded-lg border border-gray-200 p-4">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <h3 class="text-sm font-semibold text-gray-900">Tự đồng bộ khi có mạng</h3>
+                  <p class="mt-1 text-sm text-gray-500">Tự đồng bộ dữ liệu học tập khi kết nối lại.</p>
+                </div>
+                <button
+                  type="button"
+                  (click)="onToggleAutoSync()"
+                  class="inline-flex h-6 w-11 items-center rounded-full transition-colors"
+                  [class.bg-[#0056D2]]="offlineSettings.autoSyncWhenOnline()"
+                  [class.bg-gray-300]="!offlineSettings.autoSyncWhenOnline()">
+                  <span class="ml-0.5 inline-block h-5 w-5 rounded-full bg-white shadow transition-transform"
+                        [class.translate-x-5]="offlineSettings.autoSyncWhenOnline()"></span>
+                </button>
+              </div>
+              <p class="mt-3 text-xs text-gray-500">
+                @if (offlineSettings.autoSyncWhenOnline()) {
+                  Bài làm và tiến trình sẽ được gửi lên tự động khi có mạng trở lại.
+                } @else {
+                  Bạn cần bấm "Đồng bộ ngay" thủ công để gửi dữ liệu lên hệ thống.
+                }
+              </p>
+            </div>
+          </div>
+
+          <!-- Persistence -->
+          <div class="rounded-lg border border-gray-200 p-4">
+            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h3 class="text-sm font-semibold text-gray-900">Giữ bộ nhớ lâu dài</h3>
+                <p class="mt-1 text-sm text-gray-500">{{ persistenceStatusLabel() }}</p>
+              </div>
+              <button
+                type="button"
+                (click)="onRequestPersistence()"
+                [disabled]="storageManager.isPersisted()"
+                class="inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+                [class.bg-[#0056D2]]="!storageManager.isPersisted()"
+                [class.text-white]="!storageManager.isPersisted()"
+                [class.hover:bg-[#004BB5]]="!storageManager.isPersisted()"
+                [class.bg-emerald-100]="storageManager.isPersisted()"
+                [class.text-emerald-700]="storageManager.isPersisted()"
+                [class.cursor-default]="storageManager.isPersisted()">
+                {{ storageManager.isPersisted() ? 'Đã được ưu tiên giữ' : 'Yêu cầu giữ dữ liệu lâu dài' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Diagnostics (collapsed by default) -->
+      @if (latestOfflineTelemetryEvent(); as diagnosticEvent) {
+        <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div>
+              <h2 class="text-base font-semibold text-slate-900">Chẩn đoán bộ nhớ</h2>
+              <p class="mt-1 text-sm text-slate-600">
+                Sự kiện gần nhất: {{ getOfflineTelemetryTypeLabel(diagnosticEvent.type) }}
+                @if (diagnosticEvent.errorName) {
+                  <span>• {{ diagnosticEvent.errorName }}</span>
+                }
+                <span>• {{ diagnosticEvent.timestamp | date:'dd/MM/yyyy HH:mm:ss' }}</span>
+              </p>
+              @if (diagnosticEvent.errorMessage) {
+                <p class="mt-2 text-xs text-slate-500">{{ diagnosticEvent.errorMessage }}</p>
+              }
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button type="button" (click)="onCopyOfflineDiagnostics()"
+                class="rounded-lg bg-[#0056D2] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#004BB5]">
+                Sao chép
+              </button>
+              <button type="button" (click)="onClearOfflineDiagnostics()"
+                class="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50">
+                Xóa lịch sử
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Clear Data -->
+      @if (hasAnyData()) {
+        <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+          <h2 class="text-base font-semibold text-gray-900">Xóa dữ liệu ngoại tuyến</h2>
+          <p class="mt-1 text-sm text-gray-500">
+            Các thao tác dưới đây sẽ xóa dữ liệu đã tải trên thiết bị này. Tiến trình đã đồng bộ lên máy chủ không bị ảnh hưởng.
+          </p>
+          <div class="mt-4 flex flex-wrap gap-3">
+            <button type="button" (click)="onDeleteAll()"
+              class="rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-medium text-red-600 transition-colors hover:border-red-300 hover:bg-red-100">
+              Xóa tất cả dữ liệu
+            </button>
+            <button type="button" (click)="onResetOfflineStorage()"
+              class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-700 transition-colors hover:border-amber-300 hover:bg-amber-100">
+              Đặt lại bộ nhớ
+            </button>
+          </div>
+        </div>
+      }
+    }
+
+  </div>
+</div>

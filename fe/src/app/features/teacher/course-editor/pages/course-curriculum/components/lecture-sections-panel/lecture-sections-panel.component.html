@@ -1,0 +1,128 @@
+<div class="sections-header">
+  <label class="editor-label">Nội dung ({{ sections().length }} mục)</label>
+
+  <div style="display: flex; gap: 0.5rem; align-items: center">
+    <button type="button" class="add-content-btn add-content-btn--secondary" (click)="batchVideoUpload.emit()"
+            data-wiii-id="upload-video-materials-from-lesson"
+            data-wiii-click-safe="true"
+            data-wiii-click-kind="open_panel"
+            title="Tải lên nhiều video, hệ thống tự phân bổ vào các bài">
+      <lucide-icon name="upload-cloud" [size]="14"></lucide-icon>
+      Tải lên nhiều video
+    </button>
+  <div class="add-content-wrapper">
+    <button type="button" class="add-content-btn" (click)="toggleDropdown()"
+            data-wiii-id="open-add-section-menu"
+            data-wiii-click-safe="true"
+            data-wiii-click-kind="open_panel">
+      <lucide-icon name="plus" [size]="14"></lucide-icon>
+      Thêm mục
+      <lucide-icon name="chevron-down" [size]="12"></lucide-icon>
+    </button>
+
+    @if (isDropdownOpen()) {
+      <div class="add-content-dropdown">
+        <button type="button" class="add-content-option" (click)="onCreateSection('TEXT')"
+                data-wiii-id="add-text-section">
+          <div class="add-content-option__icon" style="background: rgb(241 245 249)">
+            <lucide-icon name="pilcrow" [size]="14" style="color: rgb(71 85 105)"></lucide-icon>
+          </div>
+          <div class="add-content-option__text">
+            <span class="add-content-option__label">Bài giảng</span>
+            <span class="add-content-option__hint">Nội dung văn bản, hình ảnh</span>
+          </div>
+        </button>
+
+        <button type="button" class="add-content-option" (click)="onCreateSection('VIDEO')"
+                data-wiii-id="add-video-section">
+          <div class="add-content-option__icon" style="background: rgba(0, 86, 210, 0.08)">
+            <lucide-icon name="play-circle" [size]="14" style="color: rgb(0 86 210)"></lucide-icon>
+          </div>
+          <div class="add-content-option__text">
+            <span class="add-content-option__label">Video</span>
+            <span class="add-content-option__hint">Tải lên video bài giảng</span>
+          </div>
+        </button>
+
+        <button type="button" class="add-content-option" (click)="onCreateSection('FILE')"
+                data-wiii-id="upload-material">
+          <div class="add-content-option__icon" style="background: rgba(245, 158, 11, 0.08)">
+            <lucide-icon name="file-text" [size]="14" style="color: rgb(180 83 9)"></lucide-icon>
+          </div>
+          <div class="add-content-option__text">
+            <span class="add-content-option__label">Tài liệu</span>
+            <span class="add-content-option__hint">PDF, Word, Excel, PowerPoint</span>
+          </div>
+        </button>
+
+        <button type="button" class="add-content-option" (click)="onCreateSection('QUIZ')"
+                data-wiii-id="add-quiz-section">
+          <div class="add-content-option__icon" style="background: rgba(139, 92, 246, 0.08)">
+            <lucide-icon name="help-circle" [size]="14" style="color: rgb(109 40 217)"></lucide-icon>
+          </div>
+          <div class="add-content-option__text">
+            <span class="add-content-option__label">Trắc nghiệm</span>
+            <span class="add-content-option__hint">Kiểm tra kiến thức học viên</span>
+          </div>
+        </button>
+      </div>
+    }
+  </div>
+  </div>
+</div>
+
+@if (sections().length === 0) {
+  <div class="sections-empty">
+    <p style="font-size: 0.8125rem; font-weight: 500; color: rgb(100 116 139); margin-bottom: 0.25rem">Chưa có mục nào</p>
+    <p style="font-size: 0.75rem; color: rgb(148 163 184)">Nhấn "Thêm mục" để bắt đầu soạn bài học</p>
+  </div>
+} @else {
+  <div
+    class="sections-list"
+    cdkDropList
+    cdkDropListLockAxis="y"
+    [cdkDropListData]="sections()"
+    (cdkDropListDropped)="onDropSection($event)"
+  >
+    @for (section of sections(); track section.id; let idx = $index) {
+      <div class="section-row"
+           [attr.data-wiii-id]="'edit-section-' + section.id"
+           [class.section-row--active]="activeSectionId() === section.id"
+           (click)="onEditSection(section)" cdkDrag>
+        <div class="section-row__handle" cdkDragHandle>
+          <lucide-icon name="grip-vertical" [size]="14"></lucide-icon>
+        </div>
+
+        <div class="section-row__content">
+          <div class="section-row__top">
+            <span
+              class="section-row__status"
+              [style.background]="hasContent(section) ? 'rgb(16 185 129)' : 'rgb(203 213 225)'"
+            ></span>
+            <span class="section-row__title">
+              <span class="section-row__label">{{ sectionLabel(idx) }}</span>
+              {{ stripSectionPrefix(section.title) }}
+            </span>
+            <div class="section-row__meta">
+              <span class="section-row__type">{{ getSectionTypeLabel(section.type) }}</span>
+              @if (section.isRequired) {
+                <span class="section-row__required">Bắt buộc</span>
+              }
+            </div>
+          </div>
+          <span class="section-row__snippet">{{ getSectionSnippet(section) }}</span>
+        </div>
+
+        <button
+          type="button"
+          (click)="onDeleteSection(section.id, $event)"
+          [attr.data-wiii-id]="'delete-section-' + section.id"
+          class="section-row__delete"
+          aria-label="Xóa"
+        >
+          <lucide-icon name="trash-2" [size]="14"></lucide-icon>
+        </button>
+      </div>
+    }
+  </div>
+}

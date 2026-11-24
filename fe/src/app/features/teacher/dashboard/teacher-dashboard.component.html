@@ -1,0 +1,214 @@
+<div class="dashboard-container" data-wiii-id="teacher-dashboard">
+  <div class="main-content">
+    <!-- Header — text-only greeting (Coursera pattern: avatar only in navigation) -->
+    <div class="dashboard-header">
+      <div class="header-content">
+        <div class="greeting-section">
+          <h1 class="greeting">{{ getGreeting() }}, {{ getUserFirstName() }}</h1>
+          <p class="subtitle">Tổng quan hoạt động giảng dạy</p>
+        </div>
+        <a routerLink="/teacher/course-creation" class="cta-button"
+           data-wiii-id="create-course"
+           data-wiii-click-safe="true"
+           data-wiii-click-kind="navigation">
+          <svg class="cta-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+          </svg>
+          Tạo khóa học
+        </a>
+      </div>
+    </div>
+
+    <!-- Action Banner: Cần chấm điểm (matching assessments pattern) -->
+    @if (!isLoadingAnalytics() && analytics().pendingGrading > 0) {
+      <div class="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 mb-6">
+        <div class="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100">
+          <span class="text-sm font-bold text-amber-700">{{ analytics().pendingGrading }}</span>
+        </div>
+        <p class="flex-1 text-sm font-medium text-amber-900">bài tập cần chấm điểm</p>
+        <a routerLink="/teacher/assessments/classes/assignments"
+           data-wiii-id="open-grading-queue"
+           class="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 transition-colors">
+          Xem ngay
+        </a>
+      </div>
+    }
+
+    <!-- Course List -->
+    <div class="courses-panel">
+        <!-- Tabs + View All -->
+        <div class="section-header">
+          <div class="flex flex-wrap items-center gap-2" role="tablist">
+            @for (tab of tabItems; track tab.key) {
+              <button type="button" role="tab"
+                [attr.data-wiii-id]="'teacher-dashboard-tab-' + tab.key"
+                [attr.aria-selected]="activeTab() === tab.key"
+                class="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors"
+                [class.bg-[#0056D2]]="activeTab() === tab.key"
+                [class.text-white]="activeTab() === tab.key"
+                [class.border-[#0056D2]]="activeTab() === tab.key"
+                [class.bg-white]="activeTab() !== tab.key"
+                [class.text-gray-700]="activeTab() !== tab.key"
+                [class.border-gray-200]="activeTab() !== tab.key"
+                [class.hover:border-gray-300]="activeTab() !== tab.key"
+                (click)="switchTab(tab.key)">
+                {{ tab.label }} ({{ tab.key === 'all' ? teacher.courses().length : getTabCount(tab.key) }})
+              </button>
+            }
+          </div>
+          @if (hasMoreCourses()) {
+            <a routerLink="/teacher/courses/library" class="view-all-link"
+               data-wiii-id="browse-teacher-courses"
+               data-wiii-click-safe="true"
+               data-wiii-click-kind="navigation">
+              Xem tất cả
+            </a>
+          }
+        </div>
+
+        <!-- Loading -->
+        @if (teacher.isLoading()) {
+          <div class="courses-list">
+            @for (i of [1, 2, 3]; track i) {
+              <div class="course-card">
+                <div class="course-card-body">
+                  <div class="course-thumbnail skeleton-thumb"></div>
+                  <div class="course-metadata">
+                    <div class="skeleton-line w60"></div>
+                    <div class="skeleton-line w40"></div>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        }
+
+        <!-- Error -->
+        @if (teacher.error() && !teacher.isLoading()) {
+          <div class="empty-state">
+            <div class="empty-state-icon">
+              <svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
+              </svg>
+            </div>
+            <h3 class="empty-state-title">Không thể tải dữ liệu</h3>
+            <p class="empty-state-text">{{ teacher.error() }}</p>
+            <button class="retry-link" (click)="retryLoad()">Thử lại</button>
+          </div>
+        }
+
+        <!-- Empty -->
+        @if (!teacher.isLoading() && !teacher.error() && teacher.courses().length === 0) {
+          <div class="empty-state">
+            <div class="empty-state-icon">
+              <svg width="40" height="40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"/>
+              </svg>
+            </div>
+            <h3 class="empty-state-title">Chưa có khóa học</h3>
+            <p class="empty-state-text">Tạo khóa học đầu tiên để bắt đầu giảng dạy</p>
+            <a routerLink="/teacher/course-creation" class="retry-link"
+               data-wiii-id="create-first-course"
+               data-wiii-click-safe="true"
+               data-wiii-click-kind="navigation">Tạo khóa học mới &rarr;</a>
+          </div>
+        }
+
+        <!-- Course Cards -->
+        @if (!teacher.isLoading() && !teacher.error() && filteredCourses().length > 0) {
+          <div class="courses-list">
+            @for (course of filteredCourses(); track course.id) {
+              <div class="course-card"
+                   [attr.data-wiii-id]="'teacher-course-card-' + course.id"
+                   (click)="goToCourse(course.id)">
+                <div class="course-card-body">
+                  <!-- Thumbnail -->
+                  <div class="course-thumbnail">
+                    @if (course.thumbnail) {
+                      <img [src]="course.thumbnail" [alt]="course.title"
+                           class="thumbnail-image" loading="lazy"
+                           (error)="onThumbError($event)">
+                    } @else {
+                      <div class="thumbnail-placeholder">
+                        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"/>
+                        </svg>
+                      </div>
+                    }
+                  </div>
+
+                  <!-- Info -->
+                  <div class="course-metadata">
+                    <h3 class="course-title">{{ course.title }}</h3>
+                    <div class="course-meta">
+                      @if (course.code) {
+                        <span class="meta-code">{{ course.code }}</span>
+                        <span class="separator">&middot;</span>
+                      }
+                      <span>{{ course.enrolledStudents }} học viên</span>
+                      @if (course.modules) {
+                        <span class="separator">&middot;</span>
+                        <span>{{ course.modules }} chương</span>
+                      }
+                    </div>
+                    <div class="course-badges">
+                      @if (course.deliveryMode === 'INSTRUCTOR_LED') {
+                        <span class="delivery-badge class-mode">Lớp học</span>
+                      }
+                      @if (course.rating > 0) {
+                        <span class="rating-badge">
+                          <svg width="12" height="12" viewBox="0 0 20 20" fill="#D97706"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                          {{ course.rating.toFixed(1) }}
+                        </span>
+                      }
+                    </div>
+                  </div>
+
+                  <!-- Status + Action -->
+                  <div class="course-actions">
+                    <span class="status-badge"
+                          [class.badge-approved]="course.originalStatus === 'APPROVED' || course.originalStatus === 'PUBLISHED'"
+                          [class.badge-pending]="course.originalStatus === 'PENDING'"
+                          [class.badge-draft]="course.originalStatus === 'DRAFT'"
+                          [class.badge-rejected]="course.originalStatus === 'REJECTED'"
+                          [class.badge-archived]="course.originalStatus === 'ARCHIVED'">
+                      {{ getStatusLabel(course.originalStatus) }}
+                    </span>
+                    @if (course.teacherRole === 'CO_TEACHER') {
+                    <span class="inline-flex items-center px-1.5 py-0.5 text-[9px] font-bold text-purple-700 bg-purple-50 border border-purple-200 rounded">
+                      Đồng giảng viên
+                    </span>
+                    }
+                    <span class="course-date">{{ formatDate(course.updatedAt || course.createdAt) }}</span>
+                    <button class="edit-button"
+                            [attr.data-wiii-id]="'open-course-editor-' + course.id"
+                            data-wiii-click-safe="true"
+                            data-wiii-click-kind="navigation"
+                            (click)="goToCourse(course.id); $event.stopPropagation()">
+                      Chỉnh sửa
+                    </button>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+
+          <!-- Footer: course count + view all link -->
+          @if (hasMoreCourses()) {
+            <div class="courses-footer">
+              <span class="footer-summary">{{ footerText() }}</span>
+              <a routerLink="/teacher/courses/library" class="footer-link"
+                 data-wiii-id="browse-all-teacher-courses"
+                 data-wiii-click-safe="true"
+                 data-wiii-click-kind="navigation">
+                Xem tất cả khóa học
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/>
+                </svg>
+              </a>
+            </div>
+          }
+        }
+      </div>
+  </div>
+</div>

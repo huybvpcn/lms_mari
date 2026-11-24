@@ -1,0 +1,188 @@
+# =============================================================================
+# LMS Maritime - Docker Compose Base Configuration
+# Dev:  cp .env.dev.example .env && docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# Prod: docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml up -d
+# Source of truth: this root compose topology is the only supported runtime model.
+# =============================================================================
+
+name: lms
+
+x-service-defaults: &service-defaults
+  init: true
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+  security_opt:
+    - no-new-privileges:true
+
+services:
+  # ===== PostgreSQL Database =====
+  db:
+    <<: *service-defaults
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-lms}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lms}
+      POSTGRES_DB: ${POSTGRES_DB:-lms}
+    volumes:
+      - lms-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lms} -d ${POSTGRES_DB:-lms}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    networks:
+      - lms-backend
+
+  # ===== Spring Boot Backend =====
+  backend:
+    <<: *service-defaults
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      # Database
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-lms}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-lms}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-lms}
+      # JWT (externalized)
+      APP_JWT_SECRET: ${JWT_SECRET:-ZGV2ZWxvcG1lbnQtb25seS1zZWNyZXQta2V5LWZvci1sbXMtYXBwbGljYXRpb24tbWluaW11bS0yNTYtYml0cw==}
+      APP_JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
+      APP_JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-604800000}
+      # Cloudflare R2 Storage
+      CLOUDFLARE_R2_ENABLED: ${CLOUDFLARE_R2_ENABLED:-false}
+      CLOUDFLARE_R2_ACCOUNT_ID: ${CLOUDFLARE_R2_ACCOUNT_ID:-}
+      CLOUDFLARE_R2_ACCESS_KEY: ${CLOUDFLARE_R2_ACCESS_KEY:-}
+      CLOUDFLARE_R2_SECRET_KEY: ${CLOUDFLARE_R2_SECRET_KEY:-}
+      CLOUDFLARE_R2_BUCKET: ${CLOUDFLARE_R2_BUCKET:-lms-cdn}
+      CLOUDFLARE_R2_VIDEO_BUCKET: ${CLOUDFLARE_R2_VIDEO_BUCKET:-lms-storage}
+      CLOUDFLARE_R2_PUBLIC_URL: ${CLOUDFLARE_R2_PUBLIC_URL:-}
+      VIDEO_INGEST_ENABLED: ${VIDEO_INGEST_ENABLED:-true}
+      VIDEO_PLAYBACK_TOKEN_EXPIRY_SECONDS: ${VIDEO_PLAYBACK_TOKEN_EXPIRY_SECONDS:-14400}
+      VIDEO_SEGMENT_PRESIGN_TTL_SECONDS: ${VIDEO_SEGMENT_PRESIGN_TTL_SECONDS:-120}
+      VIDEO_MEDIA_DOMAIN: ${VIDEO_MEDIA_DOMAIN:-}
+      VIDEO_EDGE_AUTH_MODE: ${VIDEO_EDGE_AUTH_MODE:-disabled}
+      VIDEO_EDGE_HMAC_SECRET: ${VIDEO_EDGE_HMAC_SECRET:-}
+      VIDEO_EDGE_TOKEN_EXPIRY_SECONDS: ${VIDEO_EDGE_TOKEN_EXPIRY_SECONDS:-300}
+      VIDEO_MANIFEST_CACHE_SECONDS: ${VIDEO_MANIFEST_CACHE_SECONDS:-60}
+      VIDEO_OBJECT_REDIRECT_CACHE_SECONDS: ${VIDEO_OBJECT_REDIRECT_CACHE_SECONDS:-30}
+      VIDEO_PACKAGE_UPLOAD_CONCURRENCY: ${VIDEO_PACKAGE_UPLOAD_CONCURRENCY:-6}
+      VIDEO_ADAPTIVE_SEGMENT_DURATION_SECONDS: ${VIDEO_ADAPTIVE_SEGMENT_DURATION_SECONDS:-6}
+      VIDEO_FFMPEG_PRESET: ${VIDEO_FFMPEG_PRESET:-veryfast}
+      # Cloudflare Stream
+      CLOUDFLARE_STREAM_ENABLED: ${CLOUDFLARE_STREAM_ENABLED:-false}
+      CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
+      CLOUDFLARE_STREAM_API_TOKEN: ${CLOUDFLARE_STREAM_API_TOKEN:-}
+      CLOUDFLARE_STREAM_KEY_ID: ${CLOUDFLARE_STREAM_KEY_ID:-}
+      CLOUDFLARE_STREAM_PRIVATE_KEY: ${CLOUDFLARE_STREAM_PRIVATE_KEY:-}
+      CLOUDFLARE_STREAM_TOKEN_EXPIRY: ${CLOUDFLARE_STREAM_TOKEN_EXPIRY:-14400}
+      # App URLs
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:4200}
+      APP_CORS_ORIGINS: ${APP_CORS_ORIGINS:-http://localhost:4200}
+      GOOGLE_AUTH_ENABLED: ${GOOGLE_AUTH_ENABLED:-false}
+      GOOGLE_WEB_CLIENT_ID: ${GOOGLE_WEB_CLIENT_ID:-}
+      GOOGLE_OAUTH_REDIRECT_FLOW_ENABLED: ${GOOGLE_OAUTH_REDIRECT_FLOW_ENABLED:-false}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_OAUTH_REDIRECT_URI: ${GOOGLE_OAUTH_REDIRECT_URI:-}
+      GOOGLE_OAUTH_FRONTEND_CALLBACK: ${GOOGLE_OAUTH_FRONTEND_CALLBACK:-}
+      # AI Service (Wiii)
+      AI_SERVICE_URL: ${AI_SERVICE_URL:-https://wiii.holilihu.online}
+      AI_SERVICE_API_KEY: ${AI_SERVICE_API_KEY:-}
+      # Wiii Integration (Sprint 220)
+      WIII_WEBHOOK_URL: ${WIII_WEBHOOK_URL:-}
+      WIII_WEBHOOK_SECRET: ${WIII_WEBHOOK_SECRET:-}
+      WIII_WEBHOOK_ENABLED: ${WIII_WEBHOOK_ENABLED:-false}
+      WIII_SERVICE_TOKEN: ${WIII_SERVICE_TOKEN:-}
+      WIII_TOKEN_EXCHANGE_URL: ${WIII_TOKEN_EXCHANGE_URL:-}
+      # Email
+      SPRING_MAIL_HOST: ${MAIL_HOST:-}
+      SPRING_MAIL_PORT: ${MAIL_PORT:-587}
+      SPRING_MAIL_USERNAME: ${MAIL_USERNAME:-}
+      SPRING_MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      # VNPay
+      VNPAY_TMN_CODE: ${VNPAY_TMN_CODE:-}
+      VNPAY_HASH_SECRET: ${VNPAY_HASH_SECRET:-}
+      VNPAY_PAY_URL: ${VNPAY_PAY_URL:-}
+      # SePay
+      SEPAY_ENABLED: ${SEPAY_ENABLED:-false}
+      SEPAY_BANK_CODE: ${SEPAY_BANK_CODE:-}
+      SEPAY_ACCOUNT_NUMBER: ${SEPAY_ACCOUNT_NUMBER:-}
+      SEPAY_ACCOUNT_NAME: ${SEPAY_ACCOUNT_NAME:-}
+      SEPAY_WEBHOOK_API_KEY: ${SEPAY_WEBHOOK_API_KEY:-}
+      SEPAY_TEMPLATE_CODE: ${SEPAY_TEMPLATE_CODE:-compact2}
+      # Document Conversion (Gotenberg)
+      GOTENBERG_URL: ${GOTENBERG_URL:-http://gotenberg:3000}
+      # JVM Container Optimization
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
+    volumes:
+      - lms-uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    stop_grace_period: 45s
+    networks:
+      - lms-backend
+      - lms-frontend
+
+  # ===== Gotenberg (Document → PDF Conversion) =====
+  gotenberg:
+    <<: *service-defaults
+    image: gotenberg/gotenberg:8
+    command:
+      - "gotenberg"
+      - "--api-timeout=900s"
+      - "--libreoffice-restart-after=50"
+      - "--libreoffice-auto-start=true"
+      - "--libreoffice-start-timeout=90s"
+      - "--libreoffice-max-queue-size=4"
+      - "--log-level=warn"
+    networks:
+      - lms-backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 90s
+    mem_limit: "${GOTENBERG_MEMORY_LIMIT:-4096M}"
+    deploy:
+      resources:
+        limits:
+          memory: "${GOTENBERG_MEMORY_LIMIT:-4096M}"
+
+  # ===== Angular Frontend (nginx) =====
+  frontend:
+    <<: *service-defaults
+    build:
+      context: ./fe
+      dockerfile: Dockerfile
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - lms-frontend
+
+# ===== Named Volumes =====
+volumes:
+  lms-pgdata:
+    name: lms-pgdata
+  lms-uploads:
+    name: lms-uploads
+
+# ===== Networks =====
+networks:
+  lms-backend:
+    name: lms-backend
+    driver: bridge
+    internal: true  # No external access - security best practice
+  lms-frontend:
+    name: lms-frontend
+    driver: bridge
+  # wiii-network removed: Wiii now on separate server (wiii.holilihu.online)

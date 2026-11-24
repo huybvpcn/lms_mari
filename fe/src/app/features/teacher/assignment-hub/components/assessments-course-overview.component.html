@@ -1,0 +1,69 @@
+<div class="mx-auto max-w-screen-2xl px-4 sm:px-6 py-3">
+  <div class="grid gap-4 lg:grid-cols-[1fr_320px]">
+    <!-- Main: context + quick actions -->
+    <div class="space-y-4">
+      <div class="rounded-lg border border-slate-200 bg-white px-4 py-3">
+        <p class="text-sm text-slate-600 font-medium">
+          Assessment ở cấp khóa học là canonical content — quiz shell và bài tập nằm trong curriculum.
+          Phân phối, bài nộp và chấm điểm nằm ở <a routerLink="/teacher/assessments/classes/assignments" class="text-[#0056D2] font-semibold hover:underline">Lớp học</a>.
+        </p>
+      </div>
+
+      <div class="grid gap-2 sm:grid-cols-2">
+        <a routerLink="/teacher/courses"
+           class="flex items-center gap-3 px-4 py-3 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:border-[#0056D2] hover:text-[#0056D2] transition-colors group">
+          <lucide-icon name="book-open" [size]="16" class="text-slate-400 group-hover:text-[#0056D2] transition-colors"></lucide-icon>
+          <span class="flex-1">Danh sách khóa học</span>
+          <lucide-icon name="arrow-right" [size]="14" class="text-slate-300 group-hover:text-[#0056D2] transition-colors"></lucide-icon>
+        </a>
+
+        <a routerLink="/teacher/assessments/classes/assignments"
+           class="flex items-center gap-3 px-4 py-3 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:border-[#0056D2] hover:text-[#0056D2] transition-colors group">
+          <lucide-icon name="clipboard-list" [size]="16" class="text-slate-400 group-hover:text-[#0056D2] transition-colors"></lucide-icon>
+          <span class="flex-1">Vận hành bài tập</span>
+          <lucide-icon name="arrow-right" [size]="14" class="text-slate-300 group-hover:text-[#0056D2] transition-colors"></lucide-icon>
+        </a>
+
+        <a routerLink="/teacher/assessments/classes/quizzes"
+           class="flex items-center gap-3 px-4 py-3 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:border-[#0056D2] hover:text-[#0056D2] transition-colors group">
+          <lucide-icon name="list-checks" [size]="16" class="text-slate-400 group-hover:text-[#0056D2] transition-colors"></lucide-icon>
+          <span class="flex-1">Vận hành bài kiểm tra</span>
+          <lucide-icon name="arrow-right" [size]="14" class="text-slate-300 group-hover:text-[#0056D2] transition-colors"></lucide-icon>
+        </a>
+
+        <a routerLink="/teacher/assessments/shared/question-bank"
+           class="flex items-center gap-3 px-4 py-3 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:border-[#0056D2] hover:text-[#0056D2] transition-colors group">
+          <lucide-icon name="database" [size]="16" class="text-slate-400 group-hover:text-[#0056D2] transition-colors"></lucide-icon>
+          <span class="flex-1">Ngân hàng câu hỏi</span>
+          <lucide-icon name="arrow-right" [size]="14" class="text-slate-300 group-hover:text-[#0056D2] transition-colors"></lucide-icon>
+        </a>
+
+        <a routerLink="/teacher/assessments/shared/rubrics"
+           class="flex items-center gap-3 px-4 py-3 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:border-[#0056D2] hover:text-[#0056D2] transition-colors group">
+          <lucide-icon name="file-text" [size]="16" class="text-slate-400 group-hover:text-[#0056D2] transition-colors"></lucide-icon>
+          <span class="flex-1">Thư viện Rubric</span>
+          <lucide-icon name="arrow-right" [size]="14" class="text-slate-300 group-hover:text-[#0056D2] transition-colors"></lucide-icon>
+        </a>
+      </div>
+    </div>
+
+    <!-- Sidebar: workflow -->
+    <aside class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+      <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-3">Quy trình chuẩn</p>
+      <ol class="space-y-2.5 text-sm text-slate-600">
+        <li class="flex gap-2.5">
+          <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white border border-slate-200 text-[10px] font-semibold text-slate-500">1</span>
+          <span>Mở khóa học, vào curriculum editor</span>
+        </li>
+        <li class="flex gap-2.5">
+          <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white border border-slate-200 text-[10px] font-semibold text-slate-500">2</span>
+          <span>Tạo quiz hoặc bài tập shell trong đúng chapter</span>
+        </li>
+        <li class="flex gap-2.5">
+          <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white border border-slate-200 text-[10px] font-semibold text-slate-500">3</span>
+          <span>Chuyển sang <strong>Lớp học</strong> để phân phối, chấm điểm</span>
+        </li>
+      </ol>
+    </aside>
+  </div>
+</div>

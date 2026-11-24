@@ -1,0 +1,694 @@
+@use '../../../../../../styles/variables' as *;
+
+/* ===== PAGE ===== */
+.dashboard-page {
+  background: $bg-page;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ===== HEADER ===== */
+.header-bar {
+  background: white;
+  border-bottom: 1px solid $border-default;
+}
+
+.header-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: $spacing-4 $spacing-6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $spacing-4;
+  flex-wrap: wrap;
+}
+
+.page-title {
+  font-size: $text-2xl;
+  font-weight: $font-bold;
+  color: $text-primary;
+  margin: 0;
+  line-height: $leading-tight;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: $spacing-3;
+  flex-shrink: 0;
+}
+
+/* Header action buttons — primary "Mời thành viên" + secondary "Xem analytics".
+   Mirrors admin-system-dashboard pattern (PR #159). Stripe/Linear convention. */
+.btn-primary,
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: $spacing-2 $spacing-4;
+  min-height: 40px; // WCAG 2.2 SC 2.5.8 touch target
+  font-size: $text-sm;
+  font-weight: $font-semibold;
+  border-radius: $radius-md;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background $transition-fast, border-color $transition-fast, color $transition-fast;
+  white-space: nowrap;
+
+  @include focus-visible;
+}
+
+.btn-primary {
+  background: $blue-primary;
+  color: white;
+  border: 1px solid $blue-primary;
+
+  &:hover { background: $blue-hover; border-color: $blue-hover; }
+  &:active { background: $blue-pressed; border-color: $blue-pressed; }
+}
+
+.btn-secondary {
+  background: white;
+  color: $text-primary;
+  border: 1px solid $border-default;
+
+  &:hover { background: $gray-50; border-color: $border-dark; }
+  &:active { background: $gray-100; }
+}
+
+/* ===== MAIN ===== */
+.dashboard-main {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: $spacing-6;
+}
+
+/* ===== CARD BASE ===== */
+.card {
+  background: white;
+  border-radius: $radius-md;
+  border: 1px solid $border-default;
+  box-shadow: $shadow-sm;
+}
+
+.card-header {
+  padding: $spacing-4 $spacing-5;
+  border-bottom: 1px solid $border-light;
+}
+
+.card-title {
+  font-size: $text-base;
+  font-weight: $font-semibold;
+  color: $text-primary;
+  margin: 0;
+}
+
+.card-body {
+  padding: $spacing-5;
+}
+
+/* ===== ACTION CARDS =====
+   Visual contract lives in <app-action-card> (F-OA-1, PR for issue #210).
+   Only the grid container stays here — card rules removed to avoid drift.
+   Skeleton loader placeholder still owns its own selector below. */
+.action-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: $spacing-4;
+  margin-bottom: $spacing-5;
+
+  @media screen and (max-width: $breakpoint-sm) {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ===== CONTENT GRID ===== */
+.content-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: $spacing-4;
+  margin-bottom: $spacing-5;
+  min-width: 0;
+
+  @include desktop {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* ===== CHART CARD ===== */
+.chart-card {
+  overflow: hidden;
+}
+
+.chart-area {
+  padding: $spacing-5;
+  min-height: 400px;
+}
+
+/* ===== DATA TABLE ===== */
+.table-scroll {
+  max-height: 420px;
+  overflow-y: auto;
+
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: $gray-300;
+    border-radius: 2px;
+  }
+
+  scrollbar-width: thin;
+  scrollbar-color: $gray-300 transparent;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table thead tr {
+  background: $gray-50;
+  border-bottom: 1px solid $border-default;
+}
+
+.data-table th {
+  text-align: left;
+  font-size: 12px;
+  font-weight: $font-semibold;
+  color: $gray-500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 10px $spacing-4;
+}
+
+.data-table td {
+  padding: $spacing-3 $spacing-4;
+  font-size: $text-sm;
+  vertical-align: middle;
+}
+
+.data-table tbody tr {
+  border-bottom: 1px solid $border-light;
+  transition: background $transition-fast;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &:hover {
+    background: $gray-50;
+  }
+}
+
+.date-text {
+  color: $text-muted;
+}
+
+/* Action buttons */
+.action-btns {
+  display: flex;
+  gap: $spacing-2;
+}
+
+.btn-approve {
+  padding: 4px $spacing-3;
+  font-size: $text-xs;
+  font-weight: $font-medium;
+  background: $blue-primary;
+  color: white;
+  border: none;
+  border-radius: $radius-sm;
+  cursor: pointer;
+  transition: background $transition-normal;
+
+  &:hover {
+    background: $blue-hover;
+  }
+}
+
+.btn-reject {
+  padding: 4px $spacing-3;
+  font-size: $text-xs;
+  font-weight: $font-medium;
+  background: $gray-100;
+  color: $gray-600;
+  border: none;
+  border-radius: $radius-sm;
+  cursor: pointer;
+  transition: background $transition-normal;
+
+  &:hover {
+    background: $gray-200;
+  }
+}
+
+/* Table loading / empty */
+.table-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: $spacing-3;
+  padding: $spacing-12 0;
+  color: $text-muted;
+  font-size: $text-sm;
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid $gray-200;
+  border-top-color: $blue-primary;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.table-empty {
+  text-align: center;
+  padding: $spacing-12 0;
+  color: $gray-400;
+
+  svg {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto $spacing-3;
+    display: block;
+  }
+
+  p {
+    font-size: $text-sm;
+    color: $text-muted;
+    margin: 0;
+  }
+}
+
+/* ===== STAT GRID ===== */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: $spacing-4;
+
+  @include tablet {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.stat-box {
+  @extend .card;
+  padding: $spacing-5;
+  text-align: center;
+}
+
+.stat-value {
+  font-size: $text-2xl;
+  font-weight: $font-bold;
+  margin: 0 0 $spacing-1;
+
+  &.warning {
+    color: $warning;
+  }
+
+  &.success {
+    color: $success;
+  }
+
+  &.error {
+    color: $error;
+  }
+
+  &.primary {
+    color: $blue-primary;
+  }
+}
+
+.stat-label {
+  font-size: $text-xs;
+  font-weight: $font-medium;
+  color: $text-muted;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0;
+}
+
+/* ===== SKELETON ===== */
+.skeleton-action-card {
+  @extend .card;
+  padding: $spacing-5 $spacing-6;
+}
+
+.skeleton-card {
+  @extend .card;
+  padding: $spacing-5;
+}
+
+.skeleton-stat {
+  @extend .card;
+  padding: $spacing-5;
+  text-align: center;
+}
+
+.sk {
+  background: $gray-200;
+  border-radius: 4px;
+}
+
+.sk-light {
+  background: $gray-100;
+  border-radius: 4px;
+}
+
+/* ===== RESPONSIVE ===== */
+@media screen and (max-width: $breakpoint-md) {
+  .dashboard-main {
+    padding: $spacing-5 $spacing-4;
+  }
+
+  .header-inner {
+    padding: $spacing-3 $spacing-4;
+  }
+
+  .action-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: $spacing-3;
+  }
+}
+
+@media screen and (max-width: $breakpoint-sm) {
+  .dashboard-main {
+    padding: $spacing-3 $spacing-3;
+  }
+
+  .header-inner {
+    padding: $spacing-3;
+  }
+
+  .page-title {
+    font-size: $text-lg;
+  }
+
+  .header-inner {
+    flex-wrap: wrap;
+  }
+
+  .header-actions {
+    width: 100%;
+  }
+
+  .btn-primary,
+  .btn-secondary {
+    flex: 1;
+    min-height: 44px; // iOS 44pt touch target
+  }
+
+  .action-grid {
+    grid-template-columns: 1fr;
+    gap: $spacing-3;
+  }
+
+  // .action-card / .action-value mobile rules now live inside
+  // <app-action-card> (matches breakpoint-sm media query there).
+
+  .card-header {
+    padding: $spacing-3 $spacing-4;
+  }
+
+  .card-body {
+    padding: $spacing-3 $spacing-4;
+  }
+
+  .card-title {
+    font-size: $text-sm;
+  }
+
+  .chart-area {
+    padding: $spacing-3;
+    min-height: 300px;
+  }
+
+  .data-table th {
+    padding: 8px $spacing-3;
+    font-size: 10px;
+  }
+
+  .data-table td {
+    padding: 8px $spacing-3;
+    font-size: 13px;
+  }
+
+  .stat-grid {
+    gap: $spacing-3;
+  }
+
+  .stat-box {
+    padding: $spacing-4;
+  }
+
+  .stat-value {
+    font-size: $text-xl;
+  }
+
+  .content-grid {
+    gap: $spacing-3;
+    margin-bottom: $spacing-3;
+  }
+}
+
+@media screen and (max-width: 340px) {
+  .dashboard-main {
+    padding: $spacing-3 $spacing-2;
+  }
+
+  // .action-card / .action-value / .action-label ultra-small rules now live
+  // inside <app-action-card> (matches its 340px media query).
+
+  .stat-box {
+    padding: $spacing-3;
+  }
+
+  .stat-value {
+    font-size: $text-lg;
+  }
+
+  .stat-label {
+    font-size: 10px;
+  }
+}
+
+@media print {
+  :host {
+    display: block;
+  }
+
+  .dashboard-page {
+    background: white !important;
+    min-height: auto !important;
+    overflow: visible !important;
+  }
+
+  .header-bar {
+    border-bottom: 2px solid $text-primary;
+  }
+
+  .header-inner {
+    padding: 8px 0 6px !important;
+    max-width: 100% !important;
+  }
+
+  .page-title {
+    font-size: 18px !important;
+  }
+
+  .dashboard-main {
+    padding: 10px 0 0 !important;
+    max-width: 100% !important;
+  }
+
+  .card,
+  .stat-box {
+    box-shadow: none !important;
+    border: 1px solid $gray-300 !important;
+    border-radius: 2px !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .action-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 8px !important;
+    margin-bottom: 10px !important;
+  }
+
+  // .action-card / .action-link print rules now live inside
+  // <app-action-card> (own @media print block).
+
+  .content-grid {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+    margin-bottom: 10px !important;
+  }
+
+  .chart-card {
+    display: none !important;
+  }
+
+  .action-btns {
+    display: none !important;
+  }
+
+  .header-actions {
+    display: none !important;
+  }
+
+  .skeleton-action-card,
+  .skeleton-card,
+  .skeleton-stat {
+    display: none !important;
+  }
+
+  .table-scroll {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .data-table th {
+    padding: 6px 8px !important;
+    font-size: 10px !important;
+  }
+
+  .data-table td {
+    padding: 6px 8px !important;
+    font-size: 12px !important;
+  }
+
+  .data-table tbody tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .stat-grid {
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 8px !important;
+  }
+
+  .stat-box {
+    padding: 8px !important;
+  }
+
+  .stat-value {
+    font-size: 16px !important;
+  }
+
+  .stat-value {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
+/* ===== REJECT MODAL ===== */
+.reject-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reject-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #0f172a;
+
+  .required {
+    color: #dc2626;
+    margin-left: 2px;
+  }
+}
+
+.reject-textarea {
+  width: 100%;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #0f172a;
+  background: #f8fafc;
+  resize: vertical;
+  transition: border-color 0.15s;
+  font-family: inherit;
+  box-sizing: border-box;
+
+  &:focus {
+    outline: none;
+    border-color: #0056D2;
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(0, 86, 210, 0.08);
+  }
+
+  &::placeholder {
+    color: #94a3b8;
+  }
+}
+
+.reject-hint {
+  font-size: 12px;
+  color: #64748b;
+  margin: 0;
+
+  &.error {
+    color: #dc2626;
+  }
+}
+
+.btn-cancel {
+  padding: 8px 16px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #475569;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+
+  &:hover:not(:disabled) {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.btn-confirm-reject {
+  padding: 8px 20px;
+  border: none;
+  border-radius: 8px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+
+  &:hover:not(:disabled) {
+    background: #b91c1c;
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}

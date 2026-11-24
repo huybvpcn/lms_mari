@@ -1,0 +1,40 @@
+.assessments-shell {
+  background: #fafafa;
+}
+
+.assessments-header {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 16px 24px 0;
+}
+
+.assessments-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.assessments-label {
+  color: #9ca3af;
+  font-weight: 500;
+}
+
+.assessments-separator {
+  color: #d1d5db;
+}
+
+.assessments-current {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+@media (max-width: 768px) {
+  .assessments-header {
+    padding: 12px 16px 0;
+  }
+
+  .assessments-breadcrumb {
+    font-size: 12px;
+  }
+}

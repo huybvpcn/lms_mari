@@ -1,0 +1,373 @@
+import { Injectable, signal, computed, inject } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
+import { UploadedFile } from '../models/uploaded-file.model';
+import { FileApi, FileUploadResponse } from '../../api/client/file.api';
+
+// Use shared UploadedFile model
+
+export interface UploadProgress {
+  fileId: string;
+  fileName: string;
+  progress: number;
+  status: 'uploading' | 'completed' | 'error';
+  error?: string;
+}
+
+export interface FileUploadOptions {
+  category: 'course' | 'assignment' | 'profile' | 'document' | 'image' | 'video';
+  maxSize?: number; // in bytes
+  allowedTypes?: string[];
+  generateThumbnail?: boolean;
+  compress?: boolean;
+  quality?: number; // for image compression
+}
+
+@Injectable({
+  providedIn: 'root'
+})
+export class FileUploadService {
+  private fileApi = inject(FileApi);
+
+  // Signals for reactive state management
+  private _uploadedFiles = signal<UploadedFile[]>([]);
+  private _uploadProgress = signal<Map<string, UploadProgress>>(new Map());
+  private _isUploading = signal<boolean>(false);
+  private _uploadQueue = signal<string[]>([]);
+
+  // Readonly signals for external consumption
+  readonly uploadedFiles = this._uploadedFiles.asReadonly();
+  readonly uploadProgress = this._uploadProgress.asReadonly();
+  readonly isUploading = this._isUploading.asReadonly();
+  readonly uploadQueue = this._uploadQueue.asReadonly();
+
+  // Computed signals
+  readonly totalUploadedFiles = computed(() => this._uploadedFiles().length);
+  readonly totalUploadSize = computed(() => 
+    this._uploadedFiles().reduce((sum, file) => sum + (file.size || 0), 0)
+  );
+
+  readonly filesByCategory = computed(() => {
+    const files = this._uploadedFiles();
+    return {
+    course: files.filter(f => (f as any).category === 'course'),
+    assignment: files.filter(f => (f as any).category === 'assignment'),
+    profile: files.filter(f => (f as any).category === 'profile'),
+    document: files.filter(f => (f as any).category === 'document'),
+    image: files.filter(f => (f as any).category === 'image'),
+    video: files.filter(f => (f as any).category === 'video')
+    };
+  });
+
+  readonly activeUploads = computed(() => {
+    const progressMap = this._uploadProgress();
+    return Array.from(progressMap.values()).filter(p => p.status === 'uploading');
+  });
+
+  constructor() {
+  }
+
+  // File Upload Methods
+  async uploadFile(
+    file: File, 
+    options: FileUploadOptions,
+    onProgress?: (progress: UploadProgress) => void
+  ): Promise<UploadedFile> {
+    // Validate file
+    this.validateFile(file, options);
+
+    const fileId = this.generateFileId();
+    this._isUploading.set(true);
+
+    // Add to upload queue
+    this._uploadQueue.update(queue => [...queue, fileId]);
+
+    // Initialize progress tracking
+    const initialProgress: UploadProgress = {
+      fileId,
+      fileName: file.name,
+      progress: 0,
+      status: 'uploading'
+    };
+    
+    this._uploadProgress.update(progressMap => {
+      const newMap = new Map(progressMap);
+      newMap.set(fileId, initialProgress);
+      return newMap;
+    });
+
+    try {
+      // Create FormData
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('category', options.category);
+      formData.append('generateThumbnail', String(options.generateThumbnail || false));
+      formData.append('compress', String(options.compress || false));
+      formData.append('quality', String(options.quality || 80));
+
+      // Upload file
+  const uploadedFile = await this.performUpload(formData, fileId, onProgress);
+
+      // Add to uploaded files
+      this._uploadedFiles.update(files => [uploadedFile, ...files]);
+
+      // Update progress to completed
+      this._uploadProgress.update(progressMap => {
+        const newMap = new Map(progressMap);
+        newMap.set(fileId, {
+          ...initialProgress,
+          progress: 100,
+          status: 'completed'
+        });
+        return newMap;
+      });
+
+      // Remove from queue
+      this._uploadQueue.update(queue => queue.filter(id => id !== fileId));
+
+      return uploadedFile;
+
+    } catch (error) {
+      // Update progress to error
+      this._uploadProgress.update(progressMap => {
+        const newMap = new Map(progressMap);
+        newMap.set(fileId, {
+          ...initialProgress,
+          status: 'error',
+          error: error instanceof Error ? error.message : 'Upload failed'
+        });
+        return newMap;
+      });
+
+      // Remove from queue
+      this._uploadQueue.update(queue => queue.filter(id => id !== fileId));
+
+      throw error;
+    } finally {
+      this._isUploading.set(false);
+    }
+  }
+
+  async uploadMultipleFiles(
+    files: File[],
+    options: FileUploadOptions,
+    onProgress?: (progress: UploadProgress) => void
+  ): Promise<UploadedFile[]> {
+    const uploadPromises = files.map(file => 
+      this.uploadFile(file, options, onProgress)
+    );
+
+    return Promise.all(uploadPromises);
+  }
+
+  private async performUpload(
+    formData: FormData,
+    fileId: string,
+    onProgress?: (progress: UploadProgress) => void
+  ): Promise<UploadedFile> {
+    return new Promise((resolve, reject) => {
+      const file = formData.get('file') as File;
+      const category = formData.get('category') as 'assignment' | 'lesson' | 'course' | 'profile' | 'document' || 'document';
+
+      this.fileApi.uploadFile(file, category, (uploadProgress) => {
+        // Update progress
+        this._uploadProgress.update(progressMap => {
+          const newMap = new Map(progressMap);
+          const currentProgress = newMap.get(fileId);
+          if (currentProgress) {
+            newMap.set(fileId, {
+              ...currentProgress,
+              progress: uploadProgress.percentage
+            });
+          }
+          return newMap;
+        });
+
+        // Call progress callback
+        const currentProgress = this._uploadProgress().get(fileId);
+        if (currentProgress && onProgress) {
+          onProgress(currentProgress);
+        }
+      }).subscribe({
+        next: (response: FileUploadResponse) => {
+          const uploadedFile: UploadedFile = {
+            id: response.id,
+            url: response.url,
+            originalName: response.originalName,
+            size: response.size,
+            mimeType: response.mimeType,
+            uploadedAt: response.uploadedAt,
+            thumbnailUrl: response.thumbnailUrl
+          } as UploadedFile;
+
+          resolve(uploadedFile);
+        },
+        error: (error) => {
+          reject(error);
+        }
+      });
+    });
+  }
+
+  // File Management Methods
+  async deleteFile(fileIdOrStorageKey: string): Promise<void> {
+    try {
+      const file = this._uploadedFiles().find(f => f.id === fileIdOrStorageKey);
+      const storageKey = file?.fileName || fileIdOrStorageKey;
+      await firstValueFrom(this.fileApi.deleteFile(storageKey));
+
+      this._uploadedFiles.update(files =>
+        files.filter(f => f.id !== fileIdOrStorageKey && f.fileName !== fileIdOrStorageKey)
+      );
+
+      this._uploadProgress.update(progressMap => {
+        const newMap = new Map(progressMap);
+        newMap.delete(fileIdOrStorageKey);
+        return newMap;
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  getFiles(category?: string): UploadedFile[] {
+    if (category) {
+      return this._uploadedFiles().filter(file => (file as any).category === category);
+    }
+    return this._uploadedFiles();
+  }
+
+  // File Validation Methods
+  private validateFile(file: File, options: FileUploadOptions): void {
+    // Check file size
+    if (options.maxSize && file.size > options.maxSize) {
+      throw new Error(`File size exceeds maximum allowed size of ${this.formatFileSize(options.maxSize)}`);
+    }
+
+    // Check file type
+    if (options.allowedTypes && !this.isAllowedFileType(file, options.allowedTypes)) {
+      throw new Error(`File type ${file.type} is not allowed. Allowed types: ${options.allowedTypes.join(', ')}`);
+    }
+
+    // Additional validation based on category
+    switch (options.category) {
+      case 'image':
+        if (!file.type.startsWith('image/')) {
+          throw new Error('File must be an image');
+        }
+        break;
+      case 'video':
+        if (!file.type.startsWith('video/')) {
+          throw new Error('File must be a video');
+        }
+        break;
+      case 'document':
+        const documentTypes = [
+          '.pdf',
+          'application/pdf',
+          '.doc',
+          'application/msword',
+          '.docx',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          '.xls',
+          'application/vnd.ms-excel',
+          '.xlsx',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          '.ppt',
+          'application/vnd.ms-powerpoint',
+          '.pptx',
+          'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          '.txt',
+          'text/plain'
+        ];
+        if (!this.isAllowedFileType(file, documentTypes)) {
+          throw new Error('File must be a document (PDF, Word, Excel, PowerPoint, or text)');
+        }
+        break;
+    }
+  }
+
+  // Utility Methods
+  formatFileSize(bytes: number): string {
+    if (bytes === 0) return '0 Bytes';
+    
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  getFileIcon(fileType: string): string {
+    if (fileType.startsWith('image/')) return 'image';
+    if (fileType.startsWith('video/')) return 'video';
+    if (fileType.startsWith('audio/')) return 'music';
+    if (fileType === 'application/pdf') return 'file-text';
+    if (fileType.includes('word')) return 'file-text';
+    if (fileType.includes('excel') || fileType.includes('spreadsheet')) return 'bar-chart';
+    if (fileType.includes('powerpoint') || fileType.includes('presentation')) return 'presentation';
+    if (fileType.includes('zip') || fileType.includes('rar')) return 'archive';
+    return 'file-text';
+  }
+
+  private isAllowedFileType(file: File, allowedTypes: string[]): boolean {
+    const extension = this.getFileExtension(file.name);
+    const mimeType = file.type.toLowerCase();
+
+    return allowedTypes.some(type => {
+      const allowed = type.toLowerCase();
+      if (allowed.startsWith('.')) {
+        return allowed.substring(1) === extension;
+      }
+      return mimeType === allowed || mimeType.includes(allowed) || this.isCompatibleMimeType(mimeType, allowed, extension);
+    });
+  }
+
+  private isCompatibleMimeType(mimeType: string, allowedType: string, extension: string): boolean {
+    const mimeTypeMappings: Record<string, string[]> = {
+      doc: ['application/msword', 'application/doc', 'application/vnd.ms-word'],
+      docx: ['application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+      xls: ['application/vnd.ms-excel'],
+      xlsx: ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+      ppt: ['application/vnd.ms-powerpoint'],
+      pptx: ['application/vnd.openxmlformats-officedocument.presentationml.presentation'],
+      pdf: ['application/pdf'],
+      txt: ['text/plain'],
+    };
+
+    return !!extension && mimeTypeMappings[extension]?.includes(allowedType) && (!mimeType || mimeTypeMappings[extension].includes(mimeType));
+  }
+
+  private getFileExtension(fileName: string): string {
+    return fileName.split('.').pop()?.toLowerCase() || '';
+  }
+
+  getFileCategoryIcon(category: string): string {
+    switch (category) {
+      case 'course': return 'book-open';
+      case 'assignment': return 'clipboard';
+      case 'profile': return 'user';
+      case 'document': return 'file-text';
+      case 'image': return 'image';
+      case 'video': return 'video';
+      default: return 'file-text';
+    }
+  }
+
+  private generateFileId(): string {
+    return 'file_' + Math.random().toString(36).substr(2, 9);
+  }
+
+  // Clear upload progress after completion
+  clearUploadProgress(fileId: string): void {
+    this._uploadProgress.update(progressMap => {
+      const newMap = new Map(progressMap);
+      newMap.delete(fileId);
+      return newMap;
+    });
+  }
+
+  // Clear all upload progress
+  clearAllUploadProgress(): void {
+    this._uploadProgress.set(new Map());
+  }
+}

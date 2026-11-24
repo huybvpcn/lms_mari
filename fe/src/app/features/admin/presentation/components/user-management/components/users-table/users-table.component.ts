@@ -1,0 +1,364 @@
+import { Component, inject, output, ChangeDetectionStrategy } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { UserManagementState } from '../../state/user-management.state';
+import { AdminUser } from '../../../../../infrastructure/services/admin.service';
+import { exportToCsv } from '../../../../../../../shared/utils/csv-export';
+import { KebabMenuComponent, KebabAction } from '../../../../../../../shared/components/admin/kebab-menu/kebab-menu.component';
+import { formatRelativeTimeVN } from '../../../../../../../shared/utils/relative-time.util';
+
+@Component({
+  selector: 'app-users-table',
+  imports: [CommonModule, FormsModule, KebabMenuComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  styles: [`
+    select.role-select {
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-block;
+      box-sizing: border-box;
+      min-width: 130px;
+      max-width: 200px;
+      width: auto;
+      line-height: 1.5;
+      appearance: auto;
+      -webkit-appearance: auto;
+      -moz-appearance: auto;
+      text-align: left;
+      padding-right: 0.75rem;
+    }
+    select.role-select:hover { border-color: #9CA3AF; }
+    select.role-select:focus { outline: none; }
+    select.role-select option { padding: 8px 12px; background: white; color: #1f2937; }
+    td { overflow: visible; }
+  `],
+  template: `
+    <!-- Toolbar -->
+    <div class="flex items-center justify-end mb-4">
+      <button (click)="exportUsersToCsv()"
+              class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+              title="Xuất CSV">
+        <svg class="w-4 h-4 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+        Xuất CSV
+      </button>
+    </div>
+
+    <div class="bg-white rounded-lg border border-gray-200 overflow-hidden relative">
+      <!-- Deletion Loading Overlay -->
+      @if (state.isDeletingUser()) {
+        <div class="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
+          <div class="text-center">
+            <div class="inline-block w-12 h-12 border-4 border-gray-200 border-t-[#0056D2] rounded-full animate-spin"></div>
+            <p class="mt-4 text-sm text-gray-600 font-medium">Đang xử lý...</p>
+          </div>
+        </div>
+      }
+
+      @if (state.isLoadingUsers()) {
+        <div class="p-12 text-center">
+          <div class="inline-block">
+            <div class="w-12 h-12 border-4 border-gray-200 border-t-[#0056D2] rounded-full animate-spin"></div>
+          </div>
+          <p class="mt-4 text-sm text-gray-600">Đang tải danh sách người dùng...</p>
+        </div>
+      } @else if (state.filteredUsers().length === 0) {
+        <div class="p-12 text-center">
+          <svg class="w-16 h-16 text-gray-300 mx-auto mb-4" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 8v1h1.5a.5.5 0 01.5.5v9a.5.5 0 01-.5.5h-13a.5.5 0 01-.5-.5v-9a.5.5 0 01.5-.5H8v-1a5 5 0 00-5 5v1h9.93z"></path>
+          </svg>
+          <h3 class="text-base font-medium text-gray-900 mb-2">Không tìm thấy người dùng</h3>
+          <p class="text-sm text-gray-600 mb-4">Thử điều chỉnh bộ lọc hoặc tìm kiếm với từ khóa khác</p>
+          <button (click)="state.clearFilters()"
+                  class="inline-flex items-center px-4 py-2 bg-[#0056D2] text-white text-sm font-medium rounded hover:bg-[#004BB5] transition-colors">
+            Xóa bộ lọc
+          </button>
+        </div>
+      } @else {
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider w-10">
+                  <input type="checkbox"
+                         class="w-4 h-4 cursor-pointer"
+                         style="accent-color: #0056D2"
+                         [checked]="state.allVisibleSelected()"
+                         (change)="state.toggleSelectAll()"
+                         aria-label="Chọn tất cả người dùng đang hiển thị" />
+                </th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Người dùng</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Vai trò</th>
+                <th class="px-6 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">Thao tác</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Trạng thái</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Hoạt động cuối</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Thống kê</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-100">
+              @for (user of state.filteredUsers(); track user.id) {
+                <tr class="hover:bg-gray-50 transition-colors"
+                    [class.bg-blue-50]="state.isSelected(user.id)">
+                  <!-- Bulk select -->
+                  <td class="px-4 py-4 whitespace-nowrap text-center">
+                    <input type="checkbox"
+                           class="w-4 h-4 cursor-pointer"
+                           style="accent-color: #0056D2"
+                           [checked]="state.isSelected(user.id)"
+                           (change)="state.toggleSelection(user.id)"
+                           [attr.aria-label]="'Chọn ' + user.name" />
+                  </td>
+                  <!-- Người dùng -->
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="flex items-center">
+                      <img [src]="user.avatar || state.getDefaultAvatar(user.email)"
+                           [alt]="user.name"
+                           class="w-10 h-10 rounded-full border border-gray-200">
+                      <div class="ml-3">
+                        <div class="text-sm font-medium text-gray-900">{{ user.name }}</div>
+                        <div class="text-xs text-gray-500">{{ user.email }}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <!-- Vai trò -->
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    @if (state.canChangeRole(user)) {
+                      <select [ngModel]="user.role"
+                              (ngModelChange)="state.onRoleChange(user.id, user.role, $event)"
+                              [name]="'user-role-' + user.id"
+                              class="role-select px-3 py-1.5 text-xs font-medium rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#0056D2] focus:border-transparent cursor-pointer bg-white"
+                              [ngClass]="state.getRoleClass(user.role)"
+                              title="Click để thay đổi vai trò">
+                        @for (roleOpt of state.ROLE_OPTIONS; track roleOpt.value) {
+                          <option [value]="roleOpt.value">{{ roleOpt.label }}</option>
+                        }
+                      </select>
+                    } @else {
+                      <span class="inline-flex px-3 py-1.5 text-xs font-medium rounded border"
+                            [ngClass]="state.getRoleClass(user.role)">
+                        {{ state.getRoleText(user.role) }}
+                      </span>
+                    }
+                  </td>
+                  <!-- Thao tác — CC-10: shared kebab consolidates the inline
+                       status select + delete icon into a single overflow
+                       menu. Per-row guards (status/delete privileges) gate
+                       which actions appear in the menu. -->
+                  <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                    <div class="flex items-center justify-center">
+                      @if (rowActionsFor(user).length > 0) {
+                        <app-kebab-menu
+                          [actions]="rowActionsFor(user)"
+                          [triggerAriaLabel]="'Mở menu thao tác cho ' + user.name"
+                          (actionClick)="onRowAction(user, $event)" />
+                      } @else {
+                        <span class="text-xs text-gray-400">—</span>
+                      }
+                    </div>
+                  </td>
+                  <!-- Trạng thái -->
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="inline-flex items-center px-2.5 py-0.5 text-xs font-medium rounded"
+                          [class]="state.getStatusBadgeClass(user.accountStatus)">
+                      <span class="w-1.5 h-1.5 rounded-full mr-1.5"
+                            [class]="state.getStatusDotClass(user.accountStatus)"></span>
+                      {{ state.getStatusLabel(user.accountStatus) }}
+                    </span>
+                  </td>
+                  <!-- Hoạt động cuối — Linear / GitHub / Stripe pattern:
+                       relative time + tooltip ISO. Đồng bộ dashboard PR #222.
+                       cursor-help + title chỉ khi có lastLogin (tránh tooltip
+                       rỗng + hand cursor confusing trên cell "Chưa đăng nhập"). -->
+                  <td class="px-6 py-4 whitespace-nowrap text-xs text-gray-600"
+                      [class.cursor-help]="user.lastLogin"
+                      [attr.title]="user.lastLogin || null">
+                    {{ user.lastLogin ? formatRelativeTime(user.lastLogin) : 'Chưa đăng nhập' }}
+                  </td>
+                  <!-- Thống kê -->
+                  <td class="px-6 py-4 whitespace-nowrap text-xs text-gray-600">
+                    <div class="space-y-1">
+                      @if (isTeacherRole(user.role)) {
+                        <div class="flex items-center">
+                          <svg class="w-3 h-3 mr-1.5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"></path>
+                            <path fill-rule="evenodd" d="M4 5a2 2 0 012-2v1a1 1 0 001 1h6a1 1 0 001-1V3a2 2 0 012 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"></path>
+                          </svg>
+                          <span>{{ user.coursesCreated || 0 }} khóa học</span>
+                        </div>
+                      }
+                      @if (isStudentRole(user.role)) {
+                        <div class="flex items-center">
+                          <svg class="w-3 h-3 mr-1.5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"></path>
+                            <path fill-rule="evenodd" d="M4 5a2 2 0 012-2v1a1 1 0 001 1h6a1 1 0 001-1V3a2 2 0 012 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"></path>
+                          </svg>
+                          <span>{{ user.coursesEnrolled || 0 }} đã đăng ký</span>
+                        </div>
+                      }
+                      @if (!isTeacherRole(user.role) && !isStudentRole(user.role)) {
+                        <span class="text-gray-400">Không áp dụng</span>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination -->
+        @if (state.pagination() && state.pagination()!.totalPages > 1) {
+          <div class="bg-white px-4 py-3 border-t border-gray-200 sm:px-6">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div class="text-sm text-gray-700">
+                <p>
+                  Hiển thị
+                  <span class="font-medium">{{ ((state.pagination()!.page - 1) * state.pagination()!.limit) + 1 }}</span>
+                  đến
+                  <span class="font-medium">{{ state.getMinValue(state.pagination()!.page * state.pagination()!.limit, state.pagination()!.totalItems) }}</span>
+                  trong tổng số
+                  <span class="font-medium">{{ state.pagination()!.totalItems }}</span>
+                  kết quả
+                </p>
+              </div>
+
+              <div class="flex items-center space-x-1">
+                <nav class="hidden sm:inline-flex rounded-md shadow-sm" aria-label="Pagination">
+                  <button (click)="state.goToPage(state.pagination()!.page - 1)"
+                          [disabled]="state.pagination()!.page === 1"
+                          class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <span class="sr-only">Previous</span>
+                    <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                    </svg>
+                  </button>
+
+                  @for (page of state.getVisiblePages(); track page) {
+                    <button (click)="state.goToPage(page)"
+                            [class]="page === state.pagination()!.page ? 'z-10 bg-[#0056D2]/5 border-[#0056D2] text-[#0056D2] relative inline-flex items-center px-4 py-2 border text-sm font-medium' : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50 relative inline-flex items-center px-4 py-2 border text-sm font-medium'">
+                      {{ page }}
+                    </button>
+                  }
+
+                  <button (click)="state.goToPage(state.pagination()!.page + 1)"
+                          [disabled]="state.pagination()!.page === state.pagination()!.totalPages"
+                          class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <span class="sr-only">Next</span>
+                    <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                    </svg>
+                  </button>
+                </nav>
+              </div>
+            </div>
+          </div>
+        }
+      }
+    </div>
+  `
+})
+export class UsersTableComponent {
+  readonly state = inject(UserManagementState);
+
+  statusAction = output<{ user: AdminUser; status: string }>();
+
+  // Cột "Hoạt động cuối" — relative time (Linear / GitHub / Stripe pattern).
+  // Tooltip [title] giữ ISO timestamp cho tra cứu chính xác.
+  // AdminUser.lastLogin là `Date | null` (admin.service:885 convert ISO->Date),
+  // util accept union nên truyền thẳng Date.
+  formatRelativeTime(input: Date | string | null | undefined): string {
+    return formatRelativeTimeVN(input);
+  }
+
+  isTeacherRole(role: string | null | undefined): boolean {
+    return role?.toLowerCase() === 'teacher';
+  }
+
+  isStudentRole(role: string | null | undefined): boolean {
+    return role?.toLowerCase() === 'student';
+  }
+
+  onStatusAction(user: AdminUser, status: string): void {
+    if (status) {
+      this.statusAction.emit({ user, status });
+    }
+  }
+
+  /**
+   * Per-row kebab actions for the all-users surface. Honours the same
+   * guards the previous inline controls did:
+   *  - status changes only when `state.canChangeStatus(user)`
+   *  - Vô hiệu hóa only when `state.canDeleteUser(user)` (ADMIN only)
+   * If neither permission is granted (e.g. ORG_ADMIN viewing an ADMIN row)
+   * the kebab is suppressed entirely — the cell renders an em-dash.
+   */
+  rowActionsFor(user: AdminUser): KebabAction[] {
+    const items: KebabAction[] = [];
+    const status = user.accountStatus;
+
+    if (this.state.canChangeStatus(user)) {
+      if (status !== 'ACTIVE') {
+        items.push({
+          key: 'status:ACTIVE',
+          label: 'Kích hoạt',
+          ariaLabel: `Kích hoạt tài khoản ${user.name}`,
+          icon: 'M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z',
+        });
+      }
+      if (status !== 'BLOCKED') {
+        items.push({
+          key: 'status:BLOCKED',
+          label: 'Khóa',
+          variant: 'danger',
+          ariaLabel: `Khóa tài khoản ${user.name}`,
+          icon: 'M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z',
+        });
+      }
+      if (status !== 'RESTRICTED') {
+        items.push({
+          key: 'status:RESTRICTED',
+          label: 'Hạn chế',
+          ariaLabel: `Hạn chế tài khoản ${user.name}`,
+          icon: 'M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z',
+        });
+      }
+    }
+
+    if (this.state.canDeleteUser(user)) {
+      items.push({
+        key: 'delete',
+        label: 'Vô hiệu hóa tài khoản',
+        variant: 'danger',
+        ariaLabel: `Vô hiệu hóa tài khoản ${user.name}`,
+        icon: 'M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z',
+      });
+    }
+
+    return items;
+  }
+
+  onRowAction(user: AdminUser, key: string): void {
+    if (key === 'delete') {
+      this.state.deleteUser(user.id);
+      return;
+    }
+    if (key.startsWith('status:')) {
+      this.statusAction.emit({ user, status: key.slice('status:'.length) });
+    }
+  }
+
+  exportUsersToCsv(): void {
+    const users = this.state.filteredUsers();
+    const headers = ['Email', 'Họ tên', 'Vai trò', 'Trạng thái', 'Ngày tạo'];
+    const rows = users.map(u => [
+      u.email,
+      u.name,
+      this.state.getRoleText(u.role),
+      this.state.getStatusLabel(u.accountStatus),
+      u.createdAt ? this.state.formatDate(u.createdAt) : ''
+    ]);
+    const today = new Date().toISOString().slice(0, 10);
+    exportToCsv(headers, rows, `users_${today}.csv`);
+  }
+}

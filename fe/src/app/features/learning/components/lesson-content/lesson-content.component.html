@@ -1,0 +1,502 @@
+<div class="lesson-learning-shell">
+
+
+  <!-- Reading Area -->
+  <div class="lesson-reading-area" role="region" aria-labelledby="lesson-heading">
+
+    <!-- Lesson Title (Always at top) -->
+    @if (hasSections() && currentSection(); as section) {
+    <header class="lesson-header">
+      <p class="lesson-kicker">Chương {{ chapterIndex() + 1 }} / {{ currentSectionNumber() }}</p>
+      <h1 id="lesson-heading" class="lesson-title" tabindex="-1">
+        {{ lesson().title }}
+      </h1>
+      <app-competency-badge [lessonId]="lesson().id" [courseId]="lesson().courseId" />
+    @if (section.title) {
+      <h2 class="lesson-section-title">
+      {{ section.title }}
+      </h2>
+    }
+    </header>
+    } @else {
+    <header class="lesson-header">
+      <p class="lesson-kicker">{{ lessonNumber() }}</p>
+      <h1 id="lesson-heading" class="lesson-title" tabindex="-1">
+        {{ lesson().title }}
+      </h1>
+      <app-competency-badge [lessonId]="lesson().id" [courseId]="lesson().courseId" />
+    </header>
+    }
+
+    <!-- Single-column layout (Coursera/edX/Khan Academy hybrid) — no tab nav.
+         Content always renders. Personal notes live in a side drawer toggled
+         by the floating button at bottom-right. The lesson-attachments tab
+         was removed because section.type === 'FILE' already surfaces every
+         attachment via the unified file card below. -->
+    <div class="lesson-content-body">
+      @if (currentSection(); as section) {
+      <div class="lesson-content-flow text-slate-800 pb-6">
+        @if (section.type === 'TEXT') {
+          @if (section.content) {
+          <div class="lesson-prose prose prose-slate max-w-none" #textContent [innerHTML]="getSanitizedHtml(section.content)"></div>
+          @if (readingProgress() > 0 && readingProgress() < 100) {
+          <div class="flex items-center gap-2 text-xs text-slate-400 mt-4">
+            <div class="flex-1 h-1 bg-slate-100 rounded-full">
+              <div class="h-full bg-green-500 rounded-full transition-all" [style.width.%]="readingProgress()"></div>
+            </div>
+            <span>{{ readingProgress() | number:'1.0-0' }}% đã đọc</span>
+          </div>
+          }
+          } @else {
+          <div class="flex flex-col items-center justify-center py-12 text-slate-400 border border-dashed border-slate-200 rounded-lg">
+            <app-icon name="file-text" size="xl" class="mb-3 opacity-40"></app-icon>
+            <p class="text-sm font-medium text-slate-500">Phần này chưa có nội dung văn bản</p>
+            <p class="text-xs text-slate-400 mt-1">Giảng viên sẽ bổ sung nội dung sớm.</p>
+          </div>
+          }
+        }
+
+<!-- VIDEO + FILE notification cards removed: the actual video player and the
+            unified file card already render the content; pointing students to a
+            "khung phía trên" they were already looking at was AI-slop chatter. -->
+
+
+
+      @if (section.type === 'QUIZ') {
+      <div class="p-6 border border-amber-200 bg-amber-50 rounded-lg text-center">
+        <app-icon name="file-check" size="xl" class="mb-2 text-amber-600"></app-icon>
+        @if (section.title) {
+        <h3 class="text-lg font-bold text-slate-800 mb-1">{{ section.title }}</h3>
+        }
+        @if (quizPresentation(); as quizMeta) {
+        <div class="mb-3 flex flex-wrap items-center justify-center gap-2">
+          <span class="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-slate-700">{{ quizMeta.label }}</span>
+          <span class="rounded-full px-3 py-1 text-[11px] font-semibold"
+            [class.bg-emerald-100]="quizMeta.allowOffline"
+            [class.text-emerald-700]="quizMeta.allowOffline"
+            [class.bg-amber-100]="!quizMeta.allowOffline"
+            [class.text-amber-700]="!quizMeta.allowOffline">
+            {{ quizMeta.supportLabel }}
+          </span>
+        </div>
+        <p class="text-sm text-slate-500 mb-4">{{ quizMeta.hint }}</p>
+        @if (quizBlockedMessage(); as blockedMessage) {
+        <p class="mb-4 rounded-lg border border-amber-200 bg-white/80 px-3 py-2 text-xs font-medium text-amber-700">
+          {{ blockedMessage }}
+        </p>
+        }
+        } @else {
+        <p class="text-sm text-slate-500 mb-4">Sẵn sàng kiểm tra kiến thức của bạn?</p>
+        }
+        <button (click)="onGoToQuiz()"
+          [disabled]="isQuizActionBlocked()"
+          class="inline-flex items-center gap-2 px-6 py-2.5 bg-[#0056D2] text-white font-semibold rounded-lg hover:bg-[#004BB5] transition-colors disabled:cursor-not-allowed disabled:opacity-50">
+          <span>Làm bài trắc nghiệm</span>
+          <app-icon name="arrow-right" size="sm"></app-icon>
+        </button>
+      </div>
+      }
+
+      @if (section.type === 'ASSIGNMENT' && section.content) {
+      <div class="p-4 border border-[#0056D2]/20 bg-[#0056D2]/5 rounded-lg">
+        <div class="flex items-center gap-2 mb-3">
+          <app-icon name="edit" size="md" class="text-[#0056D2]"></app-icon>
+          <h3 class="text-base font-bold text-slate-800">Bài tập{{ section.title ? ': ' + section.title : '' }}</h3>
+        </div>
+        <div class="lesson-prose prose prose-slate max-w-none text-sm" [innerHTML]="getSanitizedHtml(section.content)"></div>
+      </div>
+      }
+
+      @if (section.type === 'SIMULATION') {
+      <div class="space-y-4">
+        <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-5">
+          <div class="flex items-start gap-3">
+            <div class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-emerald-700">
+              <app-icon name="ship" size="md"></app-icon>
+            </div>
+            <div class="min-w-0">
+              <h3 class="text-base font-bold text-slate-900">{{ section.title || 'Mô phỏng tương tác' }}</h3>
+              <p class="mt-1 text-sm leading-6 text-slate-700">
+                Mô phỏng Unity WebGPU yêu cầu desktop/laptop có WebGPU, WebAssembly và tăng tốc phần cứng. Điện thoại và máy tính bảng vẫn học được nội dung thay thế, video và quiz.
+              </p>
+              <div class="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
+                <span class="rounded-full bg-white px-3 py-1 text-emerald-800">PWA: {{ simulationOfflineLabel() }}</span>
+                <span class="rounded-full bg-white px-3 py-1 text-slate-700">Dung lượng: {{ simulationPackageSizeLabel() }}</span>
+                @if (simulationHasVrLab()) {
+                <span class="rounded-full bg-white px-3 py-1 text-[#0056D2]">Có bản VR lab Meta/Oculus riêng</span>
+                }
+              </div>
+            </div>
+          </div>
+        </div>
+
+        @if (simulationSupport(); as support) {
+        <div
+          class="rounded-lg border p-4 text-sm"
+          [class]="support.canRun ? 'border-slate-200 bg-white text-slate-700' : 'border-amber-200 bg-amber-50 text-amber-800'">
+          {{ support.message }}
+        </div>
+        }
+
+        @if (safeSimulationFrameUrl(); as simulationUrl) {
+        <div class="overflow-hidden rounded-lg border border-slate-200 bg-slate-950 shadow-sm">
+          <div class="flex items-center justify-between border-b border-white/10 px-4 py-2 text-xs text-slate-200">
+            <span>Bridge simulator</span>
+            <button
+              type="button"
+              (click)="openSimulationInNewTab()"
+              class="rounded-md bg-white/10 px-3 py-1 font-semibold text-white transition hover:bg-white/20">
+              Mở riêng
+            </button>
+          </div>
+          <iframe
+            class="block h-[min(70vh,720px)] min-h-[520px] w-full border-0 bg-black"
+            [src]="simulationUrl"
+            title="Maritime simulation"
+            allow="fullscreen; gamepad; xr-spatial-tracking"
+            allowfullscreen>
+          </iframe>
+        </div>
+        } @else if (section.simulationData?.fallback?.walkthroughUrl) {
+        <a
+          class="inline-flex items-center gap-2 rounded-lg bg-[#0056D2] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#004BB5]"
+          [href]="section.simulationData?.fallback?.walkthroughUrl"
+          target="_blank"
+          rel="noopener noreferrer">
+          Xem video hướng dẫn thay thế
+        </a>
+        }
+      </div>
+      }
+    </div>
+    } @else {
+    @if (lesson().content) {
+    <div class="lesson-prose prose prose-slate max-w-none pb-6" [innerHTML]="getSafeHtmlContent()"></div>
+    }
+    }
+
+    <!-- Quiz Button (non-section QUIZ lessons) -->
+    @if ((hasQuiz() || lesson().lessonType === LessonType.QUIZ) && !hasSections()) {
+    <div class="p-6 border border-amber-200 bg-amber-50 rounded-lg text-center mt-6 mb-6">
+      <app-icon name="file-check" size="xl" class="mb-2 text-amber-600"></app-icon>
+      @if (quizPresentation(); as quizMeta) {
+      <h3 class="text-lg font-bold text-slate-800 mb-1">{{ quizMeta.label }}</h3>
+      <div class="mb-3 flex flex-wrap items-center justify-center gap-2">
+        <span class="rounded-full px-3 py-1 text-[11px] font-semibold"
+          [class.bg-emerald-100]="quizMeta.allowOffline"
+          [class.text-emerald-700]="quizMeta.allowOffline"
+          [class.bg-amber-100]="!quizMeta.allowOffline"
+          [class.text-amber-700]="!quizMeta.allowOffline">
+          {{ quizMeta.supportLabel }}
+        </span>
+      </div>
+      <p class="text-sm text-slate-500 mb-4">{{ quizMeta.hint }}</p>
+      @if (quizBlockedMessage(); as blockedMessage) {
+      <p class="mb-4 rounded-lg border border-amber-200 bg-white/80 px-3 py-2 text-xs font-medium text-amber-700">
+        {{ blockedMessage }}
+      </p>
+      }
+      } @else {
+      <h3 class="text-lg font-bold text-slate-800 mb-1">Kiểm tra</h3>
+      <p class="text-sm text-slate-500 mb-4">Sẵn sàng kiểm tra kiến thức của bạn?</p>
+      }
+      <button (click)="onGoToQuiz()"
+        [disabled]="isQuizActionBlocked()"
+        class="inline-flex items-center gap-2 px-6 py-2.5 bg-[#0056D2] text-white font-semibold rounded-lg hover:bg-[#004BB5] transition-colors disabled:cursor-not-allowed disabled:opacity-50">
+        <span>Làm bài trắc nghiệm</span>
+        <app-icon name="arrow-right" size="sm"></app-icon>
+      </button>
+    </div>
+    }
+
+    <!-- Media area: video / file unified card. Always visible — no tab gate. -->
+    <div class="lesson-media-area mb-4 w-full">
+      @if (currentSection(); as section) {
+      <!-- VIDEO SECTION -->
+      @if (section.type === 'VIDEO') {
+      <div class="lesson-video-frame relative aspect-video w-full rounded-lg overflow-hidden shadow-sm bg-black border border-gray-100 mb-6">
+        @if (!section.streamVideoUid && isYouTubeUrl(section.videoUrl || lesson().videoUrl)) {
+          @if (isSectionOnlineOnlyVideoBlocked(section)) {
+          <div class="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-slate-950 px-6 text-center text-white">
+            <app-icon name="play-circle" size="xl" class="text-white/80"></app-icon>
+            <p class="text-sm font-semibold">Video YouTube chỉ phát trực tuyến</p>
+            <p class="max-w-md text-xs leading-5 text-white/70">Thiết bị đang offline. Kết nối mạng để phát video này; nội dung đã tải trong bài vẫn có thể học ngoại tuyến.</p>
+          </div>
+          } @else {
+          <app-youtube-player [videoUrl]="(section.videoUrl || lesson().videoUrl)!" [lessonId]="lesson().id" [sectionId]="section.id"
+            [completionThreshold]="section.completionThreshold"
+            [interactiveVideoSpec]="section.interactiveVideoSpec || null"
+            (videoEnded)="onVideoEnd()" />
+          }
+        } @else {
+        <app-adaptive-video-player [lessonId]="lesson().id" [sectionId]="section.id"
+          [videoAssetId]="section.videoAssetId || null" [videoSourceKind]="section.videoSourceKind || null"
+          [rawVideoUrl]="section.videoUrl || null" [streamVideoUid]="section.streamVideoUid || null"
+          [offlineVideoUrl]="resolveSectionOfflineVideoUrl(section)"
+          [interactiveVideoSpec]="section.interactiveVideoSpec || null"
+          [completionThreshold]="section.completionThreshold" (videoEnded)="onVideoEnd()" />
+        }
+        <!-- Thin progress bar at top -->
+        <div class="absolute top-0 left-0 right-0 h-[3px] bg-white/10 z-10">
+          <div class="h-full bg-[#0056D2] transition-all" [style.width.%]="videoProgress()"></div>
+        </div>
+        <!-- Completed badge -->
+        @if (videoCompleted()) {
+        <div
+          class="absolute top-3 right-3 px-2 py-0.5 bg-green-500/90 text-white text-[11px] font-semibold rounded z-10">
+          Hoàn thành
+        </div>
+        }
+      </div>
+      }
+
+      <!-- FILE SECTION — unified card (Coursera Resources / Notion file embed pattern) -->
+      @if (section.type === 'FILE' && section.fileUrl) {
+        @let ext = fileExtension(section.fileUrl);
+        @let typeMeta = fileTypeMeta(ext);
+        @let displayName = fileDisplayName(section);
+      <article class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+        <!-- Header: file identity + primary action -->
+        <header class="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
+          <div class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
+               [class]="typeMeta.bgClass + ' ' + typeMeta.textClass">
+            <app-icon [name]="ext === 'pdf' ? 'file-text' : 'paperclip'" size="md"></app-icon>
+          </div>
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-semibold text-slate-800 truncate" [title]="displayName">{{ displayName }}</p>
+            <p class="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1.5">
+              <span class="font-medium">{{ typeMeta.label }}</span>
+              @if (ext) {
+                <span class="text-slate-300" aria-hidden="true">·</span>
+                <span class="uppercase tabular-nums">.{{ ext }}</span>
+              }
+            </p>
+          </div>
+          <a [href]="section.fileUrl" download target="_blank" rel="noopener noreferrer"
+             class="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-[#0056D2] hover:bg-[#004BB5] rounded-lg transition-colors shrink-0"
+             [attr.aria-label]="'Tải xuống ' + displayName">
+            <app-icon name="download" size="sm"></app-icon>
+            <span class="hidden sm:inline">Tải xuống</span>
+          </a>
+        </header>
+
+        <!-- Preview area: PDF iframe, or fallback message for unsupported types -->
+        @if (useMobilePdfSlideViewer() && currentPdfSourceUrl()) {
+          <app-pdf-slide-viewer
+            [sourceUrl]="currentPdfSourceUrl() || ''"
+            [fileName]="displayName"
+            [downloadUrl]="section.fileUrl"></app-pdf-slide-viewer>
+        } @else if (safePdfUrl()) {
+          <div #pdfContainer class="relative w-full bg-slate-100 group">
+            <iframe [src]="safePdfUrl()"
+                    class="w-full h-[520px] md:h-[680px] block"
+                    frameborder="0" loading="lazy"
+                    [title]="'Xem trước ' + displayName"></iframe>
+            <!-- Floating toolbar (PDF-only actions) -->
+            <div class="absolute top-3 right-3 z-10 flex items-center gap-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+              <button type="button" (click)="togglePdfFullscreen()"
+                class="flex items-center gap-1.5 px-3 py-1.5 bg-white/95 backdrop-blur border border-gray-200 text-slate-700 text-xs font-semibold rounded-lg shadow-sm hover:text-[#0056D2] transition-colors"
+                title="Xem toàn màn hình" aria-label="Xem toàn màn hình">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+                <span class="hidden sm:inline">Toàn màn hình</span>
+              </button>
+              <button type="button" (click)="openPdfInNewTab()"
+                class="flex items-center gap-1.5 px-3 py-1.5 bg-white/95 backdrop-blur border border-gray-200 text-slate-700 text-xs font-semibold rounded-lg shadow-sm hover:text-[#0056D2] transition-colors"
+                title="Mở trong tab mới" aria-label="Mở trong tab mới">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                <span class="hidden sm:inline">Tab mới</span>
+              </button>
+            </div>
+          </div>
+        } @else if (isImageFile(ext)) {
+          <!-- Native image preview -->
+          <div class="bg-slate-100 flex items-center justify-center">
+            <img [src]="section.fileUrl" [alt]="displayName"
+                 class="max-w-full max-h-[520px] md:max-h-[680px] object-contain block"
+                 loading="lazy" />
+          </div>
+        } @else if (isConvertibleDocumentFile(ext) && documentPreviewStatus(section) !== 'FAILED') {
+          <!-- Office document is being converted to a normalized PDF preview. -->
+          <div class="px-4 py-5 text-center bg-slate-50/60 text-sm text-slate-600">
+            <app-icon name="info" size="sm" class="text-slate-400 align-middle mr-1"></app-icon>
+            Đang chuẩn bị bản xem trước. Tệp PowerPoint lớn có thể mất vài phút; bấm <strong>"Tải xuống"</strong> để xem ngay nếu cần.
+          </div>
+        } @else if (isConvertibleDocumentFile(ext) && documentPreviewStatus(section) === 'FAILED') {
+          <div class="px-4 py-5 text-center bg-amber-50 text-sm text-amber-800">
+            <app-icon name="info" size="sm" class="text-amber-500 align-middle mr-1"></app-icon>
+            {{ documentPreviewFailureMessage() }}
+          </div>
+        } @else if (ext === 'pdf') {
+          <!-- PDF requested but preview URL not ready (still converting / failed) -->
+          <div class="px-4 py-5 text-center bg-slate-50/60 text-sm text-slate-600">
+            <app-icon name="info" size="sm" class="text-slate-400 align-middle mr-1"></app-icon>
+            Đang chuẩn bị bản xem trước. Bấm <strong>"Tải xuống"</strong> để xem ngay nếu cần.
+          </div>
+        } @else {
+          <!-- Generic fallback: ZIP and other formats without an in-browser preview path. -->
+          <div class="px-4 py-5 text-center bg-slate-50/60 text-sm text-slate-600">
+            <app-icon name="info" size="sm" class="text-slate-400 align-middle mr-1"></app-icon>
+            Trình duyệt không hỗ trợ xem trước định dạng này. Bấm <strong>"Tải xuống"</strong> để mở bằng ứng dụng phù hợp.
+          </div>
+        }
+
+        <!-- Footer: completion control (only when section is required) -->
+        @if (section.isRequired) {
+          <footer class="px-4 py-2.5 border-t border-gray-100 bg-slate-50/50 flex items-center justify-between">
+            @if (isCurrentSectionCompleted()) {
+              <span class="flex items-center gap-1.5 text-xs font-semibold text-green-600">
+                <app-icon name="circle-check" size="sm"></app-icon>
+                Đã xem tài liệu
+              </span>
+            } @else {
+              <span class="text-xs text-amber-600 font-medium">Bắt buộc hoàn thành</span>
+              <button type="button" (click)="markFileComplete()"
+                class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#0056D2] bg-white border border-[#0056D2]/20 rounded-lg hover:bg-[#0056D2]/5 transition-colors">
+                <app-icon name="circle-check" size="sm"></app-icon>
+                Đánh dấu đã xem
+              </button>
+            }
+          </footer>
+        }
+      </article>
+      }
+      }
+
+      <!-- Lesson-level video (legacy lessons may have text/file sections plus a single lesson video) -->
+      @if (shouldShowLessonLevelVideo()) {
+      <div class="lesson-video-frame relative aspect-video w-full rounded-lg overflow-hidden shadow-sm bg-black border border-gray-100">
+        @if (!lesson().streamVideoUid && isYouTubeUrl(lesson().videoUrl)) {
+          @if (isLessonOnlineOnlyVideoBlocked()) {
+          <div class="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-slate-950 px-6 text-center text-white">
+            <app-icon name="play-circle" size="xl" class="text-white/80"></app-icon>
+            <p class="text-sm font-semibold">Video YouTube chỉ phát trực tuyến</p>
+            <p class="max-w-md text-xs leading-5 text-white/70">Thiết bị đang offline. Kết nối mạng để phát video này; nội dung đã tải trong bài vẫn có thể học ngoại tuyến.</p>
+          </div>
+          } @else {
+          <app-youtube-player [videoUrl]="lesson().videoUrl!" [lessonId]="lesson().id"
+            [sectionId]="'lesson-' + lesson().id" (videoEnded)="onVideoEnd()" />
+          }
+        } @else {
+        <app-adaptive-video-player [lessonId]="lesson().id" [sectionId]="null"
+          [rawVideoUrl]="lesson().videoUrl || null" [streamVideoUid]="lesson().streamVideoUid || null"
+          [offlineVideoUrl]="lesson().videoOfflineUri || null"
+          [interactiveVideoSpec]="null"
+          [posterUrl]="lesson().thumbnail || null" (videoEnded)="onVideoEnd()" />
+        }
+        <div class="absolute top-0 left-0 right-0 h-[3px] bg-white/10 z-10">
+          <div class="h-full bg-[#0056D2] transition-all" [style.width.%]="videoProgress()"></div>
+        </div>
+        @if (videoCompleted()) {
+        <div
+          class="absolute top-3 right-3 px-2 py-0.5 bg-green-500/90 text-white text-[11px] font-semibold rounded z-10">
+          Hoàn thành
+        </div>
+        }
+      </div>
+      }
+    </div>
+
+  </div> <!-- end content container -->
+
+<!-- Floating notes button (Coursera-style affordance) — anchored bottom-right.
+     Sits ABOVE the page's bottom navigation bar (which uses bottom-0 + z-30):
+     z-40 keeps the button on top, and bottom-24 (96px) clears the ~70px nav
+     plus the iOS home-indicator safe zone. -->
+<button type="button"
+        (click)="openNotesDrawer()"
+        class="fixed bottom-24 right-4 sm:right-6 z-40 flex items-center gap-2 pl-3.5 pr-4 py-2.5 bg-[#0056D2] hover:bg-[#004BB5] text-white text-sm font-semibold rounded-full shadow-lg hover:shadow-xl transition-all"
+        aria-label="Mở ghi chú cá nhân">
+  <app-icon name="edit" size="sm"></app-icon>
+  <span>Ghi chú</span>
+  @if (lessonNotes().length > 0) {
+    <span class="ml-0.5 px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-white/20 tabular-nums">
+      {{ lessonNotes().length }}
+    </span>
+  }
+</button>
+
+<!-- Notes side drawer — secondary surface for personal notes, fetched on open. -->
+<app-side-drawer
+    [isOpen]="notesDrawerOpen()"
+    title="Ghi chú cá nhân"
+    subtitle="Chỉ hiển thị cho bạn"
+    width="440px"
+    (onClose)="closeNotesDrawer()">
+
+  <div class="space-y-4">
+    <!-- New Note Input -->
+    <div class="border border-gray-200 rounded-lg overflow-hidden focus-within:border-[#0056D2] focus-within:ring-1 focus-within:ring-[#0056D2] transition-all">
+      <textarea class="w-full px-3 py-2.5 text-sm text-slate-800 placeholder-slate-400 resize-none outline-none"
+                rows="3" placeholder="Viết ghi chú cho bài học này..."
+                [ngModel]="newNoteContent()" (ngModelChange)="newNoteContent.set($event)"></textarea>
+      <div class="flex items-center justify-end px-2.5 py-1.5 bg-slate-50 border-t border-gray-100">
+        <button type="button"
+                class="px-3 py-1.5 bg-[#0056D2] text-white text-xs font-semibold rounded-md hover:bg-[#004BB5] transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                [disabled]="!newNoteContent().trim() || isSavingNote()"
+                (click)="createNote()">
+          @if (isSavingNote()) {
+            <span class="flex items-center gap-1">
+              <span class="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" aria-hidden="true"></span>
+              Đang lưu
+            </span>
+          } @else {
+            Lưu ghi chú
+          }
+        </button>
+      </div>
+    </div>
+
+    <!-- Notes List -->
+    @if (isLoadingNotes()) {
+      <div class="flex items-center justify-center py-6 text-slate-400">
+        <div class="w-5 h-5 border-2 border-slate-200 border-t-[#0056D2] rounded-full animate-spin mr-2.5" aria-hidden="true"></div>
+        <span class="text-sm">Đang tải ghi chú…</span>
+      </div>
+    } @else if (lessonNotes().length === 0) {
+      <div class="text-center py-8 text-slate-400">
+        <app-icon name="edit" size="lg" class="mb-2 opacity-40"></app-icon>
+        <p class="text-sm font-medium text-slate-500">Chưa có ghi chú nào</p>
+        <p class="text-xs text-slate-400 mt-1">Viết ghi chú đầu tiên để ghi nhớ điểm chính của bài học.</p>
+      </div>
+    } @else {
+      <div class="space-y-2.5">
+        @for (note of lessonNotes(); track note.id) {
+          <article class="border border-gray-200 rounded-lg bg-white hover:border-gray-300 transition-colors">
+            @if (editingNoteId() === note.id) {
+              <div class="p-3">
+                <textarea class="w-full px-3 py-2 text-sm border border-gray-200 rounded-md outline-none focus:border-[#0056D2] focus:ring-1 focus:ring-[#0056D2] resize-none"
+                          rows="4" [ngModel]="editingNoteContent()" (ngModelChange)="editingNoteContent.set($event)"></textarea>
+                <div class="flex items-center justify-end gap-2 mt-2.5">
+                  <button type="button" class="px-3 py-1.5 text-xs text-slate-500 hover:text-slate-700 font-medium transition-colors"
+                          (click)="cancelEditNote()">Huỷ</button>
+                  <button type="button" class="px-3 py-1.5 bg-[#0056D2] text-white text-xs font-semibold rounded-md hover:bg-[#004BB5] transition-colors disabled:opacity-40"
+                          [disabled]="isSavingNote()" (click)="saveEditNote()">Cập nhật</button>
+                </div>
+              </div>
+            } @else {
+              <div class="p-3">
+                <p class="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">{{ note.content }}</p>
+                <div class="flex items-center justify-between mt-2.5 pt-2 border-t border-gray-50">
+                  <span class="text-[11px] text-slate-400 tabular-nums">{{ note.createdAt | date:'dd/MM/yyyy HH:mm' }}</span>
+                  <div class="flex items-center gap-1">
+                    <button type="button" class="p-1 text-slate-400 hover:text-[#0056D2] rounded transition-colors"
+                            title="Chỉnh sửa" aria-label="Chỉnh sửa ghi chú"
+                            (click)="startEditNote(note)">
+                      <app-icon name="edit" size="sm"></app-icon>
+                    </button>
+                    <button type="button" class="p-1 text-slate-400 hover:text-red-500 rounded transition-colors"
+                            title="Xoá" aria-label="Xoá ghi chú"
+                            (click)="deleteNote(note.id)">
+                      <app-icon name="trash" size="sm"></app-icon>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            }
+          </article>
+        }
+      </div>
+    }
+  </div>
+</app-side-drawer>
+</div>

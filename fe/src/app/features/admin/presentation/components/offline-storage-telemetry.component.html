@@ -1,0 +1,397 @@
+<div class="telemetry-page">
+  <div class="telemetry-container">
+    <div class="telemetry-header">
+      <div>
+        <h1 class="telemetry-title">Giám sát bộ nhớ ngoại tuyến</h1>
+        <p class="telemetry-subtitle">
+          Theo dõi các lỗi `IndexedDB`, fallback `online-only`, thao tác reset, và xu hướng lan rộng của sự cố trên production.
+        </p>
+      </div>
+      <button type="button" (click)="refresh()" class="btn-refresh">
+        Làm mới
+      </button>
+    </div>
+
+    <div class="card">
+      <div class="analytics-header">
+        <div>
+          <h2 class="analytics-title">Analytics nhẹ</h2>
+          <p class="analytics-desc">
+            Tổng hợp trong {{ analyticsWindowDays() }} ngày gần nhất, có áp dụng bộ lọc hiện tại.
+          </p>
+        </div>
+        <div class="analytics-window">
+          <span class="analytics-window-label">Khoảng thời gian</span>
+          @for (days of [7, 14, 30]; track days) {
+            <button
+              type="button"
+              (click)="setAnalyticsWindow(days)"
+              [class]="analyticsWindowDays() === days
+                ? 'btn-window btn-window--active'
+                : 'btn-window btn-window--inactive'"
+            >
+              {{ days }} ngày
+            </button>
+          }
+        </div>
+      </div>
+
+      @if (isAnalyticsLoading()) {
+        <div class="loading-center">
+          <div class="spinner"></div>
+          <p class="loading-text">Đang tải analytics...</p>
+        </div>
+      } @else {
+        <div class="metrics-grid">
+          <div class="metric-card metric-card--default">
+            <div class="metric-label">Tổng sự cố</div>
+            <div class="metric-value">{{ summaryTotalEvents() }}</div>
+            <div class="metric-sub">Trong {{ analyticsWindowDays() }} ngày</div>
+          </div>
+
+          <div class="metric-card metric-card--default">
+            <div class="metric-label">Người dùng bị ảnh hưởng</div>
+            <div class="metric-value">{{ summaryAffectedUsers() }}</div>
+            <div class="metric-sub">Số user duy nhất</div>
+          </div>
+
+          <div class="metric-card metric-card--error">
+            <div class="metric-label metric-label--error">Disabled</div>
+            <div class="metric-value">{{ summaryDisabled() }}</div>
+            <div class="metric-sub">Fallback online-only</div>
+          </div>
+
+          <div class="metric-card metric-card--slate">
+            <div class="metric-label metric-label--slate">Online-only</div>
+            <div class="metric-value">{{ summaryOnlineOnly() }}</div>
+            <div class="metric-sub">Theo availability</div>
+          </div>
+
+          <div class="metric-card metric-card--warning">
+            <div class="metric-label metric-label--warning">Cần tải lại</div>
+            <div class="metric-value">{{ summaryRequiresRedownload() }}</div>
+            <div class="metric-sub">requiresRedownload = true</div>
+          </div>
+        </div>
+
+        <div class="charts-grid">
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title">Xu hướng theo ngày</h3>
+              <p class="chart-desc">Giúp xác định sự cố đang giảm dần hay bắt đầu lan rộng.</p>
+            </div>
+
+            <div class="chart-items">
+              @for (item of dailyTrend(); track item.date) {
+                <div class="trend-row">
+                  <div class="trend-date">{{ item.date | date:'dd/MM' }}</div>
+                  <div class="trend-bar-bg">
+                    <div
+                      class="trend-bar-fill"
+                      [style.width.%]="trendBarWidth(item)"
+                    ></div>
+                  </div>
+                  <div class="trend-count">{{ item.totalCount }}</div>
+                </div>
+              } @empty {
+                <div class="empty-chart">
+                  Chưa có dữ liệu xu hướng cho bộ lọc hiện tại.
+                </div>
+              }
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title">Top route lỗi nhiều</h3>
+              <p class="chart-desc">Giúp biết luồng nào đang phát sinh lỗi offline nhiều nhất.</p>
+            </div>
+
+            <div class="chart-bucket-items">
+              @for (item of topRoutes(); track item.label) {
+                <div>
+                  <div class="bucket-header">
+                    <div class="bucket-label">{{ item.label }}</div>
+                    <div class="bucket-count">{{ item.count }}</div>
+                  </div>
+                  <div class="bucket-bar-bg">
+                    <div
+                      class="bucket-bar-fill bucket-bar-fill--routes"
+                      [style.width.%]="bucketBarWidth(item, topRouteMax())"
+                    ></div>
+                  </div>
+                </div>
+              } @empty {
+                <div class="empty-chart">
+                  Chưa có route nổi bật.
+                </div>
+              }
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title">Top nền tảng</h3>
+              <p class="chart-desc">Đã chuẩn hóa để không còn tách kiểu `Win32` với `windows`.</p>
+            </div>
+
+            <div class="chart-bucket-items">
+              @for (item of topPlatforms(); track item.label) {
+                <div>
+                  <div class="bucket-header">
+                    <div class="bucket-label">{{ item.label }}</div>
+                    <div class="bucket-count">{{ item.count }}</div>
+                  </div>
+                  <div class="bucket-bar-bg">
+                    <div
+                      class="bucket-bar-fill bucket-bar-fill--platforms"
+                      [style.width.%]="bucketBarWidth(item, topPlatformMax())"
+                    ></div>
+                  </div>
+                </div>
+              } @empty {
+                <div class="empty-chart">
+                  Chưa có platform nổi bật.
+                </div>
+              }
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title">Top trình duyệt</h3>
+              <p class="chart-desc">Suy ra từ `userAgent` để support ưu tiên browser đang phát sinh lỗi.</p>
+            </div>
+
+            <div class="chart-bucket-items">
+              @for (item of topBrowsers(); track item.label) {
+                <div>
+                  <div class="bucket-header">
+                    <div class="bucket-label">{{ item.label }}</div>
+                    <div class="bucket-count">{{ item.count }}</div>
+                  </div>
+                  <div class="bucket-bar-bg">
+                    <div
+                      class="bucket-bar-fill bucket-bar-fill--browsers"
+                      [style.width.%]="bucketBarWidth(item, topBrowserMax())"
+                    ></div>
+                  </div>
+                </div>
+              } @empty {
+                <div class="empty-chart">
+                  Chưa có browser nổi bật.
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+
+    <div class="card">
+      <div class="filter-grid">
+        <div>
+          <label class="filter-label">Email hoặc tên người dùng</label>
+          <input
+            type="text"
+            [ngModel]="search()"
+            (ngModelChange)="search.set($event)"
+            (keyup.enter)="applyFilters()"
+            placeholder="Ví dụ: student@maritime.edu hoặc Học viên Mẫu"
+            class="filter-input"
+          />
+        </div>
+
+        <div>
+          <label class="filter-label">Loại sự kiện</label>
+          <select
+            [ngModel]="eventType()"
+            (ngModelChange)="eventType.set($event)"
+            class="filter-select"
+          >
+            <option value="">Tất cả</option>
+            <option value="disabled">disabled</option>
+            <option value="manual-reset">manual-reset</option>
+            <option value="recreate-failed">recreate-failed</option>
+          </select>
+        </div>
+
+        <button type="button" (click)="applyFilters()" class="btn-apply">
+          Áp dụng
+        </button>
+
+        <button
+          type="button"
+          (click)="resetFilters()"
+          [disabled]="!hasFilters()"
+          class="btn-reset"
+        >
+          Xóa bộ lọc
+        </button>
+      </div>
+    </div>
+
+    <div class="table-wrapper">
+      @if (isLoading()) {
+        <div class="loading-center loading-center--tall">
+          <div class="spinner spinner--lg"></div>
+          <p class="loading-text loading-text--spaced">Đang tải telemetry bộ nhớ ngoại tuyến...</p>
+        </div>
+      } @else if (logs().length === 0) {
+        <div class="empty-state">
+          <h2 class="empty-title">Chưa có bản ghi phù hợp</h2>
+          <p class="empty-desc">
+            Hãy đổi bộ lọc hoặc chờ client gửi thêm telemetry từ các phiên lỗi mới.
+          </p>
+        </div>
+      } @else {
+        <div class="table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Người dùng</th>
+                <th>Sự kiện</th>
+                <th>Trạng thái</th>
+                <th>Route</th>
+                <th>Nền tảng</th>
+                <th>Thời gian</th>
+                <th class="text-right">Chi tiết</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (log of logs(); track log.id) {
+                <tr>
+                  <td>
+                    <div>
+                      <div class="cell-user-name">{{ log.userName || 'Người dùng ẩn danh' }}</div>
+                      <div class="cell-user-email">{{ log.userEmail || log.userId }}</div>
+                    </div>
+                  </td>
+                  <td>
+                    <span [class]="getBadgeClass(log.eventType)">
+                      {{ log.eventType }}
+                    </span>
+                  </td>
+                  <td>
+                    <div class="cell-status">
+                      <span [class]="getAvailabilityBadgeClass(log.availability)">
+                        {{ log.availability }}
+                      </span>
+                      <span class="cell-recovery">Recovery: {{ recoveryLabel(log.recoveryAction) }}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="cell-text">{{ log.route || 'N/A' }}</div>
+                  </td>
+                  <td>
+                    <div class="cell-text">{{ log.normalizedPlatform || log.platform || 'N/A' }}</div>
+                    <div class="cell-text-sub">
+                      {{ log.browserFamily || 'Unknown browser' }} · {{ log.connectionType || 'unknown' }}
+                    </div>
+                  </td>
+                  <td>
+                    <div class="cell-date">{{ log.occurredAt | date:'dd/MM/yyyy HH:mm:ss' }}</div>
+                    <div class="cell-date-sub">Lưu lúc {{ log.createdAt | date:'dd/MM HH:mm:ss' }}</div>
+                  </td>
+                  <td class="text-right">
+                    <button
+                      type="button"
+                      (click)="toggleDetail(log.id)"
+                      class="detail-link"
+                    >
+                      {{ expandedId() === log.id ? 'Ẩn' : 'Xem chi tiết' }}
+                    </button>
+                  </td>
+                </tr>
+
+                @if (expandedId() === log.id) {
+                  <tr>
+                    <td colspan="7" class="detail-row-cell">
+                      <div class="detail-grid">
+                        <div class="detail-cards">
+                          <div class="detail-card">
+                            <div class="detail-label">Người dùng</div>
+                            <div class="detail-value">{{ formatUser(log) }}</div>
+                            <div class="detail-sub">{{ log.userId }}</div>
+                          </div>
+
+                          <div class="detail-card">
+                            <div class="detail-label">DB & yêu cầu tải lại</div>
+                            <div class="detail-value">{{ log.dbName }}</div>
+                            <div class="detail-sub">
+                              {{ log.requiresRedownload ? 'Cần tải lại gói' : 'Không yêu cầu tải lại' }}
+                            </div>
+                          </div>
+
+                          <div class="detail-card">
+                            <div class="detail-label">Lỗi</div>
+                            <div class="detail-value">{{ log.errorName || 'Không có' }}</div>
+                            <div class="detail-error-msg">{{ log.errorMessage || 'Không có thông điệp lỗi' }}</div>
+                          </div>
+
+                          <div class="detail-card">
+                            <div class="detail-label">Trình duyệt & nền tảng</div>
+                            <div class="detail-value">{{ log.browserFamily || 'Unknown browser' }}</div>
+                            <div class="detail-sub">{{ log.normalizedPlatform || log.platform || 'N/A' }}</div>
+                          </div>
+
+                          <div class="detail-card detail-card--full">
+                            <div class="detail-label">User agent</div>
+                            <div class="detail-ua">{{ log.userAgent || 'Không có' }}</div>
+                          </div>
+                        </div>
+
+                        <div class="payload-card">
+                          <div class="payload-header">
+                            <div>
+                              <div class="detail-label">Payload chẩn đoán</div>
+                              <div class="payload-desc">Dùng cho QA/support khi cần đối chiếu sự cố thực tế.</div>
+                            </div>
+                            <button
+                              type="button"
+                              (click)="copyPayload(log)"
+                              class="btn-copy"
+                            >
+                              Sao chép payload
+                            </button>
+                          </div>
+                          <pre class="payload-pre">{{ formatPayload(log.payload) }}</pre>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+
+    @if (totalPages() > 1) {
+      <div class="pagination">
+        <div class="pagination-info">
+          Trang {{ currentPage() + 1 }} / {{ totalPages() }} · {{ totalElements() }} bản ghi
+        </div>
+        <div class="pagination-buttons">
+          <button
+            type="button"
+            (click)="goToPage(currentPage() - 1)"
+            [disabled]="currentPage() === 0"
+            class="btn-page"
+          >
+            Trước
+          </button>
+          <button
+            type="button"
+            (click)="goToPage(currentPage() + 1)"
+            [disabled]="currentPage() >= totalPages() - 1"
+            class="btn-page"
+          >
+            Sau
+          </button>
+        </div>
+      </div>
+    }
+  </div>
+</div>

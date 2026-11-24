@@ -1,0 +1,170 @@
+
+<div class="course-curriculum-shell">
+  <!-- Sidebar toggle (visible when sidebar collapsed, e.g. mobile) -->
+  @if (store.sidebarCollapsed()) {
+    <button type="button" (click)="store.sidebarCollapsed.set(false)"
+      data-wiii-id="open-curriculum-sidebar"
+      data-wiii-click-safe="true"
+      data-wiii-click-kind="open_panel"
+      class="sidebar-toggle-btn">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+      </svg>
+      Nội dung
+    </button>
+  }
+
+  <!-- Empty State -->
+  @if (!selectedChapterId() && !selectedLessonId()) {
+    <section class="editor-card">
+      <div class="editor-card__body" style="padding: 2.5rem 1.5rem; text-align: center">
+
+        @if (store.chapters().length === 0) {
+          <h3 class="editor-card__title" style="font-size: 1rem; margin-bottom: 0.25rem">Bắt đầu xây dựng nội dung</h3>
+          <p class="editor-card__subtitle" style="margin-bottom: 1.5rem">Tạo cấu trúc khóa học theo 3 bước đơn giản</p>
+
+          <div class="editor-stack" style="text-align: left; max-width: 28rem; margin: 0 auto 1.5rem">
+            <div class="curriculum-step">
+              <span class="curriculum-step__num curriculum-step__num--active">1</span>
+              <div>
+                <p class="curriculum-step__title">Tạo chương</p>
+                <p class="editor-hint">Nhấn "Thêm chương" ở sidebar bên trái</p>
+              </div>
+            </div>
+            <div class="curriculum-step">
+              <span class="curriculum-step__num">2</span>
+              <div>
+                <p class="curriculum-step__title curriculum-step__title--muted">Thêm bài học</p>
+                <p class="editor-hint">Bài giảng, trắc nghiệm hoặc bài tập</p>
+              </div>
+            </div>
+            <div class="curriculum-step">
+              <span class="curriculum-step__num">3</span>
+              <div>
+                <p class="curriculum-step__title curriculum-step__title--muted">Thêm nội dung</p>
+                <p class="editor-hint">Văn bản, video, tài liệu, trắc nghiệm</p>
+              </div>
+            </div>
+          </div>
+
+          <p class="editor-hint" style="margin-bottom: 0.5rem">Hoặc tạo tự động từ tài liệu có sẵn</p>
+          <button type="button" (click)="openAiCourseGeneration()" class="editor-primary-button"
+                  data-wiii-id="generate-course-from-document"
+                  data-wiii-click-safe="true"
+                  data-wiii-click-kind="open_panel">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+            </svg>
+            Tạo bằng AI
+          </button>
+
+        } @else {
+          <h3 class="editor-card__title" style="font-size: 1rem; margin-bottom: 0.25rem">Chọn nội dung để chỉnh sửa</h3>
+          <p class="editor-card__subtitle">Chọn chương hoặc bài học từ sidebar bên trái</p>
+        }
+
+      </div>
+    </section>
+  }
+
+  <!-- Chapter Editor (decomposed) -->
+  @if (selectedChapterId() && !selectedLessonId()) {
+    @if (selectionService.selectedChapter(); as chapter) {
+      <app-chapter-editor
+        [chapter]="chapter"
+        [chapterLabel]="selectedChapterLabel()"
+        [isSaving]="isSaving()"
+        [isDirty]="editorDirty()"
+        [showLessonComposer]="lessonComposerOpen()"
+        [lessonDraftTitle]="lessonComposerTitle()"
+        [lessonDraftType]="lessonComposerType()"
+        [isCreatingLesson]="lessonComposerBusy()"
+        (titleChange)="onChapterTitleChange($event)"
+        (descriptionChange)="onChapterDescriptionChange($event)"
+        (saveClicked)="saveChapter()"
+        (lessonClicked)="selectLessonFromChapter($event)"
+        (addLesson)="requestAddLessonForCurrentChapter()"
+        (batchVideoUpload)="openBatchVideoUploadModal()"
+        (lessonDraftTitleChange)="onLessonComposerTitleChange($event)"
+        (lessonDraftTypeChange)="onLessonComposerTypeChange($event)"
+        (createLesson)="createLessonFromComposer()"
+        (cancelLessonCreate)="cancelLessonComposer()">
+      </app-chapter-editor>
+    }
+  }
+
+  <!-- Loading skeleton for lesson transition -->
+  @if (isLoadingLesson()) {
+    <div class="animate-pulse" style="display: flex; flex-direction: column; gap: 1rem">
+      <div style="height: 0.875rem; width: 10rem; background: rgb(226 232 240); border-radius: 0.25rem"></div>
+      <div style="height: 2.5rem; background: rgb(241 245 249); border-radius: 0.5rem"></div>
+      <div style="display: flex; justify-content: space-between; align-items: center">
+        <div style="height: 0.875rem; width: 8rem; background: rgb(226 232 240); border-radius: 0.25rem"></div>
+        <div style="height: 2rem; width: 8rem; background: rgb(241 245 249); border-radius: 0.375rem"></div>
+      </div>
+      <div style="height: 3.5rem; background: rgb(241 245 249); border-radius: 0.5rem"></div>
+      <div style="height: 3.5rem; background: rgb(241 245 249); border-radius: 0.5rem"></div>
+    </div>
+  }
+
+  <!-- Lesson Editor (decomposed) -->
+  @if (selectedLessonId() && !isLoadingLesson()) {
+    @if (selectedLesson(); as lesson) {
+      <app-lesson-editor
+        [lesson]="lesson"
+        [courseId]="store.courseTree()?.id || ''"
+        [chapterTitle]="selectionService.selectedChapter()?.title || ''"
+        [chapterLabel]="selectedChapterLabel()"
+        [lessonLabel]="selectedLessonLabel()"
+        [isSaving]="isSaving()"
+        [isDirty]="editorDirty()"
+        [quizTimeLimit]="quizTimeLimit()"
+        [quizPassingScore]="quizPassingScore()"
+        [quizMaxAttempts]="quizMaxAttempts()"
+        [quizQuestions]="quizQuestions()"
+        [quizQuestionsLoading]="quizQuestionsLoading()"
+        [assignmentDescription]="assignmentDescription"
+        [assignmentInstructions]="assignmentInstructions"
+        [assignmentDueDate]="assignmentDueDate"
+        [assignmentMaxScore]="assignmentMaxScore"
+        [quizFlowDescription]="getQuizFlowDescription()"
+        [assignmentFlowDescription]="getAssignmentFlowDescription()"
+        [placementLabel]="getLessonPlacementLabel()"
+        [audienceLabel]="getLessonAudienceLabel()"
+        [distributionLabel]="getLessonDistributionManagementLabel($any(getLessonType(lesson)))"
+        [legacyVideoCopy]="getLegacyLessonVideoPolicyCopy()"
+        (titleChange)="onLessonTitleChange($event)"
+        (saveClicked)="saveLesson()"
+        (backClicked)="backToChapter()"
+        (createSection)="openSectionEditor($any($event))"
+        (batchVideoUpload)="openBatchVideoUploadModal()"
+        (editSection)="editSection($event)"
+        (deleteSection)="deleteSection($event)"
+        (dropSection)="dropSection($event)"
+        (sectionSaved)="onSectionSaved()"
+        (sectionClosed)="onSectionClosed()"
+        (goToQuizBuilder)="goToQuizBuilder()"
+        (quizTimeLimitChange)="updateQuizTimeLimit($event)"
+        (quizPassingScoreChange)="updateQuizPassingScore($event)"
+        (quizMaxAttemptsChange)="updateQuizMaxAttempts($event)"
+        (goToAssignmentSettings)="goToAssignmentSettings()"
+        (assignmentDescriptionChange)="onAssignmentDescriptionChange($event)"
+        (assignmentInstructionsChange)="onAssignmentInstructionsChange($event)"
+        (assignmentDueDateChange)="onAssignmentDueDateChange($event)"
+        (assignmentMaxScoreChange)="onAssignmentMaxScoreChange($event)">
+      </app-lesson-editor>
+    }
+  }
+
+  <!-- Quiz Package Modals (decomposed) -->
+  <app-quiz-package-modals></app-quiz-package-modals>
+
+  <!-- Batch Video Upload Modal -->
+  <app-batch-video-upload-modal
+    [isOpen]="isBatchUploadModalOpen()"
+    [courseId]="store.courseTree()?.id ?? ''"
+    [currentChapterId]="selectedChapterId()"
+    [currentLessonId]="selectedLessonId()"
+    [availableLessons]="batchUploadAvailableLessons()"
+    (closed)="closeBatchVideoUploadModal()">
+  </app-batch-video-upload-modal>

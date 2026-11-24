@@ -1,0 +1,1279 @@
+<div class="min-h-screen bg-slate-50">
+  <!-- Top Header Bar - Fixed (during quiz-taking, review, results) -->
+  @if (quizPhase() === 'in-progress' || quizPhase() === 'review' || quizPhase() === 'results' || quizPhase() === 'submitting') {
+  <div class="bg-white border-b border-gray-200 fixed top-0 left-0 right-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <!-- Left: Back & Title -->
+        <div class="flex items-center gap-2">
+          <!-- Back Button -->
+          <button (click)="goBack()"
+            class="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            title="Quay lại">
+            <app-icon name="arrow-left" size="md" />
+          </button>
+
+          <!-- Toggle Sidebar Button (Desktop only) -->
+          <button (click)="toggleSidebar()"
+            class="hidden lg:block p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            [title]="sidebarVisible() ? 'Ẩn danh sách câu hỏi' : 'Hiện danh sách câu hỏi'">
+            @if (sidebarVisible()) {
+            <app-icon name="chevron-left" size="md" />
+            } @else {
+            <app-icon name="chevron-right" size="md" />
+            }
+          </button>
+
+          <div class="border-l border-gray-300 h-8 mx-2"></div>
+
+          <div>
+            <h1 class="text-lg font-semibold text-gray-900">{{ quizTitle() }}</h1>
+          </div>
+        </div>
+
+        <!-- Center: Timer (during active quiz + review so student knows time while reviewing) -->
+        @if (quizPhase() === 'in-progress' || quizPhase() === 'submitting' || quizPhase() === 'review') {
+        @if (hasActiveTimeConstraint()) {
+        <div class="hidden md:flex items-center gap-2 px-4 py-2 rounded-lg"
+          [class.bg-[#0056D2]/5]="timeRemaining() > timerWarnThreshold()"
+          [class.bg-yellow-50]="timeRemaining() <= timerWarnThreshold() && timeRemaining() > timerDangerThreshold()"
+          [class.bg-red-50]="timeRemaining() <= timerDangerThreshold()">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            [class.text-[#0056D2]]="timeRemaining() > timerWarnThreshold()"
+            [class.text-yellow-600]="timeRemaining() <= timerWarnThreshold() && timeRemaining() > timerDangerThreshold()"
+            [class.text-red-600]="timeRemaining() <= timerDangerThreshold()">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <span role="timer" aria-label="Thời gian còn lại" class="font-mono text-lg font-semibold"
+            [class.text-[#004BB5]]="timeRemaining() > timerWarnThreshold()"
+            [class.text-yellow-600]="timeRemaining() <= timerWarnThreshold() && timeRemaining() > timerDangerThreshold()"
+            [class.text-red-600]="timeRemaining() <= timerDangerThreshold()">{{ formatTime(timeRemaining()) }}</span>
+        </div>
+        }
+        }
+
+        <!-- Right: Progress & Submit -->
+        <div class="flex items-center gap-4">
+          @if (quizPhase() === 'in-progress' || quizPhase() === 'submitting') {
+          <div class="hidden sm:block text-sm text-gray-600">
+            <span class="font-semibold text-[#0056D2]">{{ answeredCount() }}</span> / {{ questions().length }} câu
+          </div>
+          }
+          @if (!showResults() && quizPhase() !== 'review') {
+          <button (click)="goToReview()"
+            class="px-4 py-2 bg-[#0056D2] text-white text-sm font-medium rounded-lg hover:bg-[#004BB5] transition-colors disabled:opacity-50"
+            [disabled]="submitting()">
+            @if (submitting()) {
+              Đang nộp...
+            } @else {
+              Nộp bài
+            }
+          </button>
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Spacer for fixed header -->
+  <div class="h-16"></div>
+  } <!-- end header @if -->
+
+  <!-- ==================== CONFIRMATION SCREEN (also shown behind password modal) ==================== -->
+  @if (quizPhase() === 'confirmation' || quizPhase() === 'password') {
+  <div class="flex items-center justify-center min-h-[80vh]">
+    <div class="max-w-lg w-full mx-auto px-4">
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <!-- Centered Header with Visual Identity -->
+        <div class="px-8 pt-8 pb-2 text-center">
+          <div class="w-14 h-14 bg-[#0056D2]/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <svg class="w-7 h-7 text-[#0056D2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+            </svg>
+          </div>
+          <h1 class="text-xl font-bold text-gray-900">{{ quizTitle() }}</h1>
+          @if (preflightData()?.description) {
+            <p class="text-sm text-gray-500 mt-1.5 max-w-sm mx-auto">{{ preflightData()!.description }}</p>
+          }
+        </div>
+
+        <!-- Compact Inline Stats -->
+        <div class="px-8 py-5">
+          <div class="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm">
+            @if (preflightData()?.timeLimitMinutes) {
+            <div class="flex items-center gap-1.5 text-gray-600">
+              <svg class="w-4 h-4 text-[#0056D2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              <span class="font-semibold text-gray-900">{{ preflightData()!.timeLimitMinutes }}</span> phút
+            </div>
+            }
+            <div class="flex items-center gap-1.5 text-gray-600">
+              <svg class="w-4 h-4 text-[#0056D2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+              </svg>
+              <span class="font-semibold text-gray-900">{{ preflightData()!.questionCount }}</span> câu hỏi
+            </div>
+            @if (preflightData()?.attemptsRemaining !== null) {
+            <div class="flex items-center gap-1.5 text-gray-600">
+              <svg class="w-4 h-4 text-[#0056D2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+              </svg>
+              Còn <span class="font-semibold text-gray-900">{{ preflightData()!.attemptsRemaining }}</span>/{{ preflightData()!.maxAttempts }} lần
+            </div>
+            }
+            @if (preflightData()?.passingScore) {
+            <div class="flex items-center gap-1.5 text-gray-600">
+              <svg class="w-4 h-4 text-[#0056D2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              Đậu <span class="font-semibold text-gray-900">&ge;{{ preflightData()!.passingScore }}%</span>
+            </div>
+            }
+          </div>
+        </div>
+
+        <!-- Schedule Info (dueAt / lockAt) -->
+        @if (preflightData()?.dueAt || preflightData()?.lockAt) {
+        <div class="px-8 pb-4">
+          <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 flex flex-col gap-1.5 text-sm">
+            @if (preflightData()?.dueAt) {
+            <div class="flex items-center gap-2 text-amber-800">
+              <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+              </svg>
+              <span>Hạn nộp: <strong>{{ preflightData()!.dueAt! | date:'dd/MM/yyyy HH:mm' }}</strong></span>
+            </div>
+            }
+            @if (preflightData()?.lockAt) {
+            <div class="flex items-center gap-2 text-red-700">
+              <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+              </svg>
+              <span>Đóng bài lúc: <strong>{{ preflightData()!.lockAt! | date:'dd/MM/yyyy HH:mm' }}</strong></span>
+            </div>
+            <!-- Warn if lockAt shortens effective quiz time -->
+            @if (preflightData()?.timeLimitMinutes && preflightData()?.effectiveTimeLimitSeconds != null &&
+                 preflightData()!.effectiveTimeLimitSeconds! < preflightData()!.timeLimitMinutes! * 60) {
+            <p class="text-xs text-red-600 mt-0.5 ml-6">
+              Do thời hạn đóng bài, bạn chỉ còn <strong>{{ Math.ceil(preflightData()!.effectiveTimeLimitSeconds! / 60) }} phút</strong> để làm bài.
+            </p>
+            }
+            }
+          </div>
+        </div>
+        }
+
+        <!-- CTA Section -->
+        <div class="px-8 pb-8">
+          <!-- Subtle Timer Warning -->
+          @if (preflightData()?.timeLimitMinutes || preflightData()?.lockAt) {
+          <p class="text-xs text-gray-400 text-center mb-5">
+            Thời gian được tính ngay khi bắt đầu. Bài làm sẽ tự lưu nếu bạn thoát giữa chừng.
+          </p>
+          }
+
+          <button (click)="requiresPassword() ? openPasswordModal() : confirmAndStart()"
+            class="w-full px-6 py-3.5 text-base font-semibold text-white bg-[#0056D2] rounded-xl hover:bg-[#004BB5] transition-colors shadow-sm">
+            Bắt đầu làm bài
+          </button>
+          <button (click)="goBack()"
+            class="w-full mt-2 px-6 py-2.5 text-sm font-medium text-gray-400 hover:text-gray-600 transition-colors">
+            Quay lại
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  }
+
+  <!-- ==================== RESUME PROMPT ==================== -->
+  @if (quizPhase() === 'resume-prompt') {
+  <div class="flex items-center justify-center min-h-[80vh]">
+    <div class="max-w-lg w-full mx-auto px-4">
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <!-- Header -->
+        <div class="px-8 py-6 border-b border-gray-200">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </div>
+            <div>
+              <h1 class="text-xl font-bold text-gray-900">Bạn có bài đang làm dở</h1>
+              <p class="text-sm text-gray-500">{{ quizTitle() }}</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-8">
+          <!-- Resume Info -->
+          <div class="space-y-3 mb-6">
+            @if (preflightData()?.inProgressAttempt?.timeRemainingSeconds != null) {
+            <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+              <span class="text-sm text-gray-600">Thời gian còn lại</span>
+              <span class="text-sm font-semibold font-mono"
+                [class.text-red-600]="timeRemaining() < 300"
+                [class.text-[#0056D2]]="timeRemaining() >= 300"
+                [class.animate-pulse]="timeRemaining() <= 60">
+                {{ formatTime(timeRemaining()) }}
+              </span>
+            </div>
+            }
+            @if (preflightData()?.inProgressAttempt?.answeredCount != null) {
+            <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+              <span class="text-sm text-gray-600">Câu đã trả lời</span>
+              <span class="text-sm font-semibold text-gray-900">
+                {{ preflightData()!.inProgressAttempt!.answeredCount }}/{{ preflightData()!.questionCount }}
+              </span>
+            </div>
+            }
+          </div>
+
+          <p class="text-sm text-gray-600 mb-6">
+            Bài làm dở của bạn đã được lưu tự động. Bạn có thể tiếp tục từ nơi đã dừng lại.
+          </p>
+
+          <!-- Buttons -->
+          <div class="flex gap-3 justify-end">
+            <button (click)="goBack()"
+              class="px-5 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+              Quay lại
+            </button>
+            <button (click)="resumeAttempt()"
+              class="px-6 py-2.5 text-sm font-medium text-white bg-[#0056D2] rounded-lg hover:bg-[#004BB5] transition-colors shadow-sm">
+              Tiếp tục làm bài
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  }
+
+  <!-- Offline Mode Banner -->
+  @if (isOfflineMode() && !loading()) {
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+      <div class="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+        <svg class="w-5 h-5 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+        </svg>
+        <div>
+          <p class="text-sm font-semibold text-amber-800">Chế độ ngoại tuyến</p>
+          <p class="text-xs text-amber-700 mt-0.5">Bài làm sẽ được lưu cục bộ và đồng bộ khi có mạng. Kết quả sẽ hiển thị sau khi đồng bộ.</p>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Offline submit result banner (shown after offline submission) -->
+  @if (isOfflineMode() && showResults()) {
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+      <div class="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-4">
+        <svg class="w-6 h-6 text-blue-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+        </svg>
+        <div>
+          <p class="text-sm font-semibold text-blue-800">Bài làm đã được lưu!</p>
+          <p class="text-xs text-blue-700 mt-0.5">Kết quả sẽ được tính điểm và hiển thị khi thiết bị kết nối mạng trở lại.</p>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Loading State -->
+  @if (quizPhase() === 'loading') {
+  <div class="flex items-center justify-center min-h-[60vh]">
+    <div class="text-center">
+      <div class="w-16 h-16 border-4 border-[#0056D2]/20 border-t-[#0056D2] rounded-full animate-spin mx-auto mb-4"></div>
+      <p class="text-gray-600">Đang tải bài kiểm tra...</p>
+    </div>
+  </div>
+  }
+
+  <!-- Error State -->
+  @if (quizPhase() === 'error') {
+  <div class="mx-auto max-w-[1400px] px-4 sm:px-6 py-6">
+    <!-- Breadcrumb -->
+    <nav class="mb-4 flex items-center gap-1.5 text-sm text-gray-500">
+      <a routerLink="/student/tasks" [queryParams]="{tab: 'quizzes'}" class="hover:text-[#0056D2] transition-colors">Bài cần làm</a>
+      <svg class="w-3.5 h-3.5 text-gray-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
+      <span class="text-gray-900 font-medium">Bài kiểm tra</span>
+    </nav>
+
+    <div class="max-w-md mx-auto">
+      <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
+        <div class="w-12 h-12 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg class="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z">
+            </path>
+          </svg>
+        </div>
+        <h3 class="text-base font-semibold text-gray-900 mb-2">Không thể làm bài kiểm tra</h3>
+        <p class="text-sm text-gray-500 mb-6">{{ error() }}</p>
+        <div class="flex flex-col gap-2">
+          @if (stalePackageBlocked()) {
+          <button (click)="openStorageManagement()"
+            class="w-full px-5 py-2.5 bg-[#0056D2] text-white text-sm font-medium rounded-lg hover:bg-[#004BB5] transition-colors">
+            Mở Lưu trữ ngoại tuyến
+          </button>
+          }
+          <button (click)="goBack()"
+            class="w-full px-5 py-2.5 bg-[#0056D2] text-white text-sm font-medium rounded-lg hover:bg-[#004BB5] transition-colors">
+            Quay lại bài cần làm
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  }
+
+  <!-- Password Modal Overlay (shown on top of confirmation screen) -->
+  @if (quizPhase() === 'password') {
+  <div class="fixed inset-0 z-50 flex items-center justify-center">
+    <!-- Backdrop -->
+    <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" (click)="cancelPassword()"></div>
+    <!-- Modal -->
+    <div class="relative w-full max-w-md mx-4 bg-white rounded-xl shadow-xl border border-gray-200 p-8 text-center animate-scale-in">
+      <div class="w-14 h-14 bg-[#0056D2]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+        <svg class="w-7 h-7 text-[#0056D2]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z"/>
+        </svg>
+      </div>
+      <h2 class="text-lg font-semibold text-gray-900 mb-1">Nhập mật khẩu truy cập</h2>
+      <p class="text-sm text-gray-500 mb-5">Bài kiểm tra này yêu cầu mật khẩu do giảng viên cung cấp.</p>
+
+      <div class="space-y-3">
+        <input type="password" autocomplete="off"
+               [value]="passwordInput()"
+               (input)="passwordInput.set($any($event.target).value)"
+               (keyup.enter)="submitPassword()"
+               placeholder="Nhập mật khẩu..."
+               class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-center focus:border-[#0056D2] focus:ring-2 focus:ring-[#0056D2]/20 outline-none" />
+
+        @if (passwordError()) {
+          <p class="text-sm text-red-600">{{ passwordError() }}</p>
+        }
+
+        <div class="flex gap-3 justify-center pt-1">
+          <button (click)="cancelPassword()" type="button"
+                  class="px-5 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+            Hủy
+          </button>
+          <button (click)="submitPassword()" type="button"
+                  [disabled]="loading()"
+                  class="px-5 py-2 text-sm font-medium text-white bg-[#0056D2] rounded-lg hover:bg-[#004BB5] transition-colors disabled:opacity-50">
+            @if (loading()) {
+              Đang kiểm tra...
+            } @else {
+              Bắt đầu làm bài
+            }
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  }
+
+  <!-- ==================== REVIEW / SUMMARY BEFORE SUBMIT ==================== -->
+  @if (quizPhase() === 'review') {
+  <div class="max-w-2xl mx-auto px-4 py-8">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <!-- Review Header -->
+      <div class="px-8 py-6 border-b border-gray-200">
+        <h2 class="text-xl font-bold text-gray-900">Tổng quan bài làm</h2>
+        <p class="text-sm text-gray-500 mt-1">Kiểm tra lại trước khi nộp bài</p>
+      </div>
+
+      <div class="p-8">
+        <!-- Summary Stats -->
+        <div class="grid grid-cols-3 gap-4 mb-8">
+          <div class="text-center p-4 bg-[#0056D2]/5 rounded-xl">
+            <div class="text-2xl font-bold text-[#0056D2]">{{ answeredCount() }}</div>
+            <div class="text-xs text-gray-600 mt-1">Đã trả lời</div>
+          </div>
+          <div class="text-center p-4 bg-gray-100 rounded-xl">
+            <div class="text-2xl font-bold text-gray-500">{{ unansweredCount() }}</div>
+            <div class="text-xs text-gray-600 mt-1">Chưa trả lời</div>
+          </div>
+          <div class="text-center p-4 bg-[#0056D2]/5 rounded-xl">
+            <div class="text-2xl font-bold text-[#0056D2]">{{ questions().length }}</div>
+            <div class="text-xs text-gray-600 mt-1">Tổng số câu</div>
+          </div>
+        </div>
+
+        <!-- Question Grid -->
+        <div class="mb-6">
+          <h3 class="text-sm font-semibold text-gray-700 mb-4">Danh sách câu hỏi</h3>
+          <div class="grid grid-cols-8 sm:grid-cols-10 gap-2">
+            @for (q of questions(); track q.id; let i = $index) {
+            @let answered = isAnswered(q.id);
+            <button (click)="goToQuestion(i); backToQuiz()"
+              class="w-10 h-10 rounded-lg text-sm font-medium transition-all duration-200 flex items-center justify-center relative"
+              [class.bg-[#0056D2]]="answered && !isFlagged(q.id)"
+              [class.text-white]="answered && !isFlagged(q.id)"
+              [class.bg-amber-400]="isFlagged(q.id)"
+              [class.text-white]="isFlagged(q.id)"
+              [class.bg-gray-200]="!answered && !isFlagged(q.id)"
+              [class.text-gray-600]="!answered && !isFlagged(q.id)"
+              [title]="isFlagged(q.id) ? 'Đã đánh dấu — Click để xem lại' : (answered ? 'Đã trả lời — Click để xem lại' : 'Chưa trả lời — Click để trả lời')">
+              {{ i + 1 }}
+            </button>
+            }
+          </div>
+        </div>
+
+        <!-- Legend -->
+        <div class="flex flex-wrap items-center gap-x-6 gap-y-2 mb-8 text-xs">
+          <div class="flex items-center gap-2">
+            <div class="w-4 h-4 rounded bg-[#0056D2]"></div>
+            <span class="text-gray-600">Đã trả lời</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="w-4 h-4 rounded bg-gray-200"></div>
+            <span class="text-gray-600">Chưa trả lời</span>
+          </div>
+          @if (flaggedCount() > 0) {
+          <div class="flex items-center gap-2">
+            <div class="w-4 h-4 rounded bg-amber-400"></div>
+            <span class="text-gray-600">Đã đánh dấu ({{ flaggedCount() }})</span>
+          </div>
+          }
+        </div>
+
+        <!-- Warning if unanswered -->
+        @if (unansweredCount() > 0) {
+        <div class="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg mb-6">
+          <svg class="w-5 h-5 text-amber-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+          </svg>
+          <div class="text-sm text-amber-800">
+            <p class="font-semibold">Bạn còn {{ unansweredCount() }} câu chưa trả lời:</p>
+            <div class="mt-2 flex flex-wrap gap-1.5">
+              @for (q of questions(); track q.id; let i = $index) {
+                @if (!isAnswered(q.id)) {
+                <button (click)="goToQuestion(i); backToQuiz()"
+                  class="inline-flex items-center justify-center w-7 h-7 text-xs font-semibold rounded-md bg-amber-200 text-amber-900 hover:bg-amber-300 transition-colors">
+                  {{ i + 1 }}
+                </button>
+                }
+              }
+            </div>
+          </div>
+        </div>
+        }
+
+        <!-- Buttons -->
+        <div class="flex gap-3 justify-end">
+          <button (click)="backToQuiz()"
+            class="px-5 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+            Quay lại làm bài
+          </button>
+          <button (click)="openSubmitConfirm()"
+            class="px-6 py-2.5 text-sm font-medium text-white bg-[#0056D2] rounded-lg hover:bg-[#004BB5] transition-colors shadow-sm">
+            Nộp bài
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Submit Confirmation Modal -->
+  @if (showSubmitConfirmModal()) {
+  <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
+    (keydown.escape)="cancelSubmitConfirm()">
+    <div class="bg-white rounded-xl shadow-lg max-w-md w-full overflow-hidden animate-scale-in">
+      <div class="p-8 text-center">
+        <div class="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg class="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+          </svg>
+        </div>
+        <h3 class="text-lg font-bold text-gray-900 mb-2">Xác nhận nộp bài</h3>
+        <p class="text-sm text-gray-600 mb-1">
+          Bạn đã trả lời <span class="font-semibold text-[#0056D2]">{{ answeredCount() }}/{{ questions().length }}</span> câu hỏi.
+        </p>
+        @if (unansweredCount() > 0) {
+        <p class="text-sm text-amber-600 mb-4">Còn {{ unansweredCount() }} câu chưa trả lời sẽ được tính 0 điểm.</p>
+        } @else {
+        <p class="text-sm text-gray-500 mb-4">Sau khi nộp, bạn không thể chỉnh sửa bài làm.</p>
+        }
+
+        <div class="flex gap-3 justify-center">
+          <button (click)="cancelSubmitConfirm()"
+            class="px-5 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+            Hủy
+          </button>
+          <button (click)="doConfirmedSubmit()"
+            class="px-6 py-2.5 text-sm font-medium text-white bg-[#0056D2] rounded-lg hover:bg-[#004BB5] transition-colors shadow-sm">
+            Xác nhận nộp bài
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  }
+  }
+
+  <!-- Main Quiz Content -->
+  @if (quizPhase() === 'in-progress' || quizPhase() === 'results' || quizPhase() === 'submitting') {
+  <div class="min-h-screen bg-slate-50 relative">
+    <!-- Sidebar - Question Navigator -->
+    <div
+      class="fixed top-16 left-0 hidden lg:block w-72 h-[calc(100vh-64px)] bg-white border-r border-gray-200 overflow-y-auto z-40 transition-transform duration-300"
+      [class.-translate-x-full]="!sidebarVisible()">
+      <div class="p-4">
+        <!-- Progress Circle -->
+        <div class="flex items-center justify-center mb-6">
+          <div class="relative w-32 h-32">
+            <svg class="w-32 h-32 transform -rotate-90">
+              <circle cx="64" cy="64" r="56" stroke="#E5E7EB" stroke-width="8" fill="none" />
+              <circle cx="64" cy="64" r="56" stroke="#2563EB" stroke-width="8" fill="none"
+                [attr.stroke-dasharray]="351.86"
+                [attr.stroke-dashoffset]="351.86 - (351.86 * answeredCount() / questions().length)"
+                class="transition-all duration-500" />
+            </svg>
+            <div class="absolute inset-0 flex flex-col items-center justify-center">
+              <span class="text-2xl font-bold text-gray-900">{{ answeredCount() }}</span>
+              <span class="text-xs text-gray-500">/ {{ questions().length }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Page Info -->
+        <div class="mb-4 text-center">
+          <span class="text-sm text-gray-600">Trang {{ currentPage() + 1 }} / {{ totalPages() }}</span>
+        </div>
+
+        <!-- Question Grid -->
+        <div class="mb-4">
+          <h3 class="text-sm font-medium text-gray-700 mb-3">Danh sách câu hỏi</h3>
+          <div class="grid grid-cols-5 gap-2">
+            @for (q of questions(); track q.id; let i = $index) {
+            @let isCurrent = i === currentQuestionIndex();
+            @let answered = isAnswered(q.id);
+            @let correctResult = isQuestionCorrect(q);
+            <button (click)="goToQuestion(i)"
+              class="w-10 h-10 rounded-lg text-sm font-medium transition-all duration-200 flex items-center justify-center relative"
+              [class.ring-2]="isCurrent"
+              [class.ring-[#0056D2]]="isCurrent"
+              [class.bg-green-100]="showResults() && correctResult === true"
+              [class.text-green-700]="showResults() && correctResult === true"
+              [class.bg-red-100]="showResults() && correctResult === false"
+              [class.text-red-700]="showResults() && correctResult === false"
+              [class.bg-yellow-100]="showResults() && answered && correctResult === null && quizSettings().showCorrectAnswers"
+              [class.text-yellow-700]="showResults() && answered && correctResult === null && quizSettings().showCorrectAnswers"
+              [class.bg-[#0056D2]/10]="answered && (!showResults() || (showResults() && !quizSettings().showCorrectAnswers))"
+              [class.text-[#004BB5]]="answered && (!showResults() || (showResults() && !quizSettings().showCorrectAnswers))"
+              [class.bg-gray-100]="!answered && (!showResults() || (showResults() && !quizSettings().showCorrectAnswers))"
+              [class.text-gray-600]="!answered && (!showResults() || (showResults() && !quizSettings().showCorrectAnswers))">
+              {{ i + 1 }}
+              @if (isFlagged(q.id) && !showResults()) {
+              <span class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-400 rounded-full border border-white"></span>
+              }
+            </button>
+            }
+          </div>
+        </div>
+
+        <!-- Legend -->
+        <div class="space-y-2 text-xs">
+          <div class="flex items-center gap-2">
+            <div class="w-4 h-4 rounded bg-[#0056D2]/10 ring-2 ring-[#0056D2]"></div>
+            <span class="text-gray-600">Trang hiện tại</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="w-4 h-4 rounded bg-[#0056D2]/10"></div>
+            <span class="text-gray-600">Đã trả lời</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="w-4 h-4 rounded bg-gray-100"></div>
+            <span class="text-gray-600">Chưa trả lời</span>
+          </div>
+          @if (showResults() && quizSettings().showCorrectAnswers) {
+          <div class="flex items-center gap-2">
+            <div class="w-4 h-4 rounded bg-yellow-100"></div>
+            <span class="text-gray-600">Chờ chấm điểm</span>
+          </div>
+          }
+          @if (!showResults() && flaggedCount() > 0) {
+          <div class="flex items-center gap-2">
+            <div class="w-4 h-4 rounded bg-gray-100 relative">
+              <span class="absolute -top-0.5 -right-0.5 w-2 h-2 bg-amber-400 rounded-full"></span>
+            </div>
+            <span class="text-gray-600">Đã đánh dấu</span>
+          </div>
+          }
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Content Area - Multiple Questions per Page -->
+    <div class="flex-1 justify-center p-2 lg:p-4 pb-20 lg:pb-0 transition-all duration-300" [class.ml-0]="!sidebarVisible()"
+      [class.lg:ml-72]="sidebarVisible()">
+      <div class="w-full max-w-6xl">
+        <!-- Page Header -->
+        <div class="mb-6 flex items-center justify-between">
+          <h2 class="text-xl font-semibold text-gray-900">
+            Câu {{ currentPage() * QUESTIONS_PER_PAGE + 1 }} - {{ Math.min((currentPage() + 1) * QUESTIONS_PER_PAGE,
+            questions().length) }}
+          </h2>
+          <span class="text-sm text-gray-500">Trang {{ currentPage() + 1 }} / {{ totalPages() }}</span>
+        </div>
+
+        <!-- Questions List -->
+        <div class="space-y-6">
+          @for (question of currentPageQuestions(); track question.id; let pageIdx = $index) {
+          @let globalIdx = getQuestionIndex(pageIdx);
+          <div [id]="'quiz-question-' + globalIdx" class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <!-- Question Header -->
+            <div class="px-6 py-4 bg-slate-50 border-b border-gray-200 flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-[#0056D2] rounded-lg flex items-center justify-center">
+                  <span class="text-white font-bold text-sm">{{ globalIdx + 1 }}</span>
+                </div>
+                <div>
+                  <h3 class="text-gray-900 font-semibold">Câu hỏi {{ globalIdx + 1 }}</h3>
+                  <span class="text-gray-500 text-xs">{{ getQuestionTypeLabel(question.questionType) }}</span>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                @if (quizPhase() === 'in-progress' || quizPhase() === 'submitting') {
+                <button (click)="toggleFlag(question.id); $event.stopPropagation()"
+                  class="p-2 rounded-lg transition-colors"
+                  [class.text-amber-500]="isFlagged(question.id)"
+                  [class.bg-amber-50]="isFlagged(question.id)"
+                  [class.text-gray-400]="!isFlagged(question.id)"
+                  [class.hover:bg-gray-100]="!isFlagged(question.id)"
+                  [title]="isFlagged(question.id) ? 'Bỏ đánh dấu' : 'Đánh dấu câu này để xem lại'"
+                  [attr.aria-pressed]="isFlagged(question.id)"
+                  aria-label="Đánh dấu câu hỏi">
+                  @if (isFlagged(question.id)) {
+                  <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M5 4a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 20V4z"/>
+                  </svg>
+                  } @else {
+                  <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/>
+                  </svg>
+                  }
+                </button>
+                }
+              </div>
+            </div>
+
+            <!-- Question Content -->
+            <div class="p-6">
+              <div class="mb-6">
+                <app-block-renderer [blocks]="question.contentBlocks"></app-block-renderer>
+              </div>
+
+              <!-- Question Type Hint for MULTIPLE_CHOICE -->
+              @if (question.questionType === 'MULTIPLE_CHOICE') {
+              <p class="text-sm text-[#0056D2] mb-3 italic">Chọn một hoặc nhiều đáp án đúng</p>
+              }
+
+              <!-- Render answer input based on question type -->
+              @switch (question.questionType) {
+
+                <!-- SINGLE_CHOICE: Radio-style option buttons -->
+                @case ('SINGLE_CHOICE') {
+                  <div class="space-y-3" role="radiogroup">
+                    @for (opt of question.options; track opt.key) {
+                    @let correctUnselected = isOptCorrectUnselected(question, opt.key);
+                    <button (click)="selectAnswer(question.id, opt.key)" [disabled]="showResults()"
+                      role="radio"
+                      [attr.aria-checked]="answers()[question.id] === opt.key"
+                      class="w-full text-left p-4 rounded-xl border-2 transition-all duration-200 group"
+                      [class.border-[#0056D2]]="answers()[question.id] === opt.key && (!showResults() || !quizSettings().showCorrectAnswers)"
+                      [class.bg-[#0056D2]/5]="answers()[question.id] === opt.key && (!showResults() || !quizSettings().showCorrectAnswers)"
+                      [class.border-gray-200]="answers()[question.id] !== opt.key && (!showResults() || !quizSettings().showCorrectAnswers)"
+                      [class.hover:border-[#0056D2]/30]="!showResults() && answers()[question.id] !== opt.key"
+                      [class.hover:bg-gray-50]="!showResults() && answers()[question.id] !== opt.key"
+                      [class.border-green-500]="isOptCorrectInReview(question, opt.key)"
+                      [class.bg-green-50]="isOptCorrectInReview(question, opt.key)"
+                      [class.border-red-400]="isOptWrongInReview(question, opt.key)"
+                      [class.bg-red-50]="isOptWrongInReview(question, opt.key)"
+                      [class.border-green-400]="correctUnselected"
+                      [class.border-dashed]="correctUnselected"
+                      [class.bg-green-50]="correctUnselected">
+                      <div class="flex items-center gap-4">
+                        <!-- Radio circle indicator -->
+                        <span class="w-10 h-10 rounded-full border-2 flex items-center justify-center font-semibold text-sm transition-colors"
+                          [class.border-[#0056D2]]="answers()[question.id] === opt.key && (!showResults() || !quizSettings().showCorrectAnswers)"
+                          [class.bg-[#0056D2]]="answers()[question.id] === opt.key && (!showResults() || !quizSettings().showCorrectAnswers)"
+                          [class.text-white]="(answers()[question.id] === opt.key && (!showResults() || !quizSettings().showCorrectAnswers)) || isOptCorrectInReview(question, opt.key)"
+                          [class.border-gray-300]="answers()[question.id] !== opt.key && (!showResults() || !quizSettings().showCorrectAnswers)"
+                          [class.text-gray-600]="answers()[question.id] !== opt.key && (!showResults() || !quizSettings().showCorrectAnswers)"
+                          [class.group-hover:border-[#0056D2]]="!showResults() && answers()[question.id] !== opt.key"
+                          [class.bg-green-600]="isOptCorrectInReview(question, opt.key)"
+                          [class.border-green-600]="isOptCorrectInReview(question, opt.key)"
+                          [class.bg-red-500]="isOptWrongInReview(question, opt.key)"
+                          [class.border-red-500]="isOptWrongInReview(question, opt.key)"
+                          [class.border-green-400]="correctUnselected"
+                          [class.text-green-700]="correctUnselected">
+                          {{ opt.key }}
+                        </span>
+                        @if (opt.contentBlocks?.length || opt.content) {
+                        <div class="flex-1 text-gray-700">
+                          <app-block-renderer [blocks]="opt.contentBlocks || []"></app-block-renderer>
+                        </div>
+                        }
+                        @if (isOptCorrectInReview(question, opt.key)) {
+                        <svg class="w-6 h-6 text-green-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd"
+                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                            clip-rule="evenodd"></path>
+                        </svg>
+                        }
+                        @if (isOptWrongInReview(question, opt.key)) {
+                        <svg class="w-6 h-6 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd"
+                            d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                            clip-rule="evenodd"></path>
+                        </svg>
+                        }
+                        @if (correctUnselected) {
+                        <svg class="w-6 h-6 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"></path>
+                        </svg>
+                        }
+                      </div>
+                    </button>
+                    }
+                  </div>
+                }
+
+                <!-- MULTIPLE_CHOICE: Checkbox-style option buttons -->
+                @case ('MULTIPLE_CHOICE') {
+                  <div class="space-y-3" role="group">
+                    @for (opt of question.options; track opt.key) {
+                    @let isSelected = isMultipleChoiceSelected(question.id, opt.key);
+                    @let mcCorrectUnselected = isOptCorrectUnselected(question, opt.key);
+                    <button (click)="toggleMultipleChoice(question.id, opt.key)" [disabled]="showResults()"
+                      role="checkbox"
+                      [attr.aria-checked]="isSelected"
+                      class="w-full text-left p-4 rounded-xl border-2 transition-all duration-200 group"
+                      [class.border-[#0056D2]]="isSelected && (!showResults() || !quizSettings().showCorrectAnswers)"
+                      [class.bg-[#0056D2]/5]="isSelected && (!showResults() || !quizSettings().showCorrectAnswers)"
+                      [class.border-gray-200]="!isSelected && (!showResults() || !quizSettings().showCorrectAnswers)"
+                      [class.hover:border-[#0056D2]/30]="!showResults() && !isSelected"
+                      [class.hover:bg-gray-50]="!showResults() && !isSelected"
+                      [class.border-green-500]="isOptCorrectInReview(question, opt.key)"
+                      [class.bg-green-50]="isOptCorrectInReview(question, opt.key)"
+                      [class.border-red-400]="isOptWrongInReview(question, opt.key)"
+                      [class.bg-red-50]="isOptWrongInReview(question, opt.key)"
+                      [class.border-green-400]="mcCorrectUnselected"
+                      [class.border-dashed]="mcCorrectUnselected"
+                      [class.bg-green-50]="mcCorrectUnselected">
+                      <div class="flex items-center gap-4">
+                        <!-- Checkbox square indicator -->
+                        <span class="w-10 h-10 rounded-lg border-2 flex items-center justify-center font-semibold text-sm transition-colors"
+                          [class.border-[#0056D2]]="isSelected && (!showResults() || !quizSettings().showCorrectAnswers)"
+                          [class.bg-[#0056D2]]="isSelected && (!showResults() || !quizSettings().showCorrectAnswers)"
+                          [class.text-white]="(isSelected && (!showResults() || !quizSettings().showCorrectAnswers)) || isOptCorrectInReview(question, opt.key)"
+                          [class.border-gray-300]="!isSelected && (!showResults() || !quizSettings().showCorrectAnswers)"
+                          [class.text-gray-600]="!isSelected && (!showResults() || !quizSettings().showCorrectAnswers)"
+                          [class.group-hover:border-[#0056D2]]="!showResults() && !isSelected"
+                          [class.bg-green-600]="isOptCorrectInReview(question, opt.key)"
+                          [class.border-green-600]="isOptCorrectInReview(question, opt.key)"
+                          [class.bg-red-500]="isOptWrongInReview(question, opt.key)"
+                          [class.border-red-500]="isOptWrongInReview(question, opt.key)"
+                          [class.border-green-400]="mcCorrectUnselected"
+                          [class.text-green-700]="mcCorrectUnselected">
+                          @if (isSelected && (!showResults() || !quizSettings().showCorrectAnswers)) {
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                          } @else {
+                            {{ opt.key }}
+                          }
+                        </span>
+                        @if (opt.contentBlocks?.length || opt.content) {
+                        <div class="flex-1 text-gray-700">
+                          <app-block-renderer [blocks]="opt.contentBlocks || []"></app-block-renderer>
+                        </div>
+                        }
+                        @if (isOptCorrectInReview(question, opt.key)) {
+                        <svg class="w-6 h-6 text-green-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                        </svg>
+                        }
+                        @if (isOptWrongInReview(question, opt.key)) {
+                        <svg class="w-6 h-6 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+                        </svg>
+                        }
+                        @if (mcCorrectUnselected) {
+                        <svg class="w-6 h-6 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        }
+                      </div>
+                    </button>
+                    }
+                  </div>
+                }
+
+                <!-- TRUE_FALSE: Two large radio buttons -->
+                @case ('TRUE_FALSE') {
+                  <div class="space-y-3" role="radiogroup">
+                    @for (opt of question.options; track opt.key) {
+                    @let correctUnselectedTF = isOptCorrectUnselected(question, opt.key);
+                    <button (click)="selectAnswer(question.id, opt.key)" [disabled]="showResults()"
+                      role="radio"
+                      [attr.aria-checked]="answers()[question.id] === opt.key"
+                      class="w-full text-left p-4 rounded-xl border-2 transition-all duration-200 group"
+                      [class.border-[#0056D2]]="answers()[question.id] === opt.key && (!showResults() || !quizSettings().showCorrectAnswers)"
+                      [class.bg-[#0056D2]/5]="answers()[question.id] === opt.key && (!showResults() || !quizSettings().showCorrectAnswers)"
+                      [class.border-gray-200]="answers()[question.id] !== opt.key && (!showResults() || !quizSettings().showCorrectAnswers)"
+                      [class.hover:border-[#0056D2]/30]="!showResults() && answers()[question.id] !== opt.key"
+                      [class.hover:bg-gray-50]="!showResults() && answers()[question.id] !== opt.key"
+                      [class.border-green-500]="isOptCorrectInReview(question, opt.key)"
+                      [class.bg-green-50]="isOptCorrectInReview(question, opt.key)"
+                      [class.border-red-400]="isOptWrongInReview(question, opt.key)"
+                      [class.bg-red-50]="isOptWrongInReview(question, opt.key)"
+                      [class.border-green-400]="correctUnselectedTF"
+                      [class.border-dashed]="correctUnselectedTF"
+                      [class.bg-green-50]="correctUnselectedTF">
+                      <div class="flex items-center gap-4">
+                        <span class="w-10 h-10 rounded-full border-2 flex items-center justify-center font-semibold text-sm transition-colors"
+                          [class.border-[#0056D2]]="answers()[question.id] === opt.key && (!showResults() || !quizSettings().showCorrectAnswers)"
+                          [class.bg-[#0056D2]]="answers()[question.id] === opt.key && (!showResults() || !quizSettings().showCorrectAnswers)"
+                          [class.text-white]="(answers()[question.id] === opt.key && (!showResults() || !quizSettings().showCorrectAnswers)) || isOptCorrectInReview(question, opt.key)"
+                          [class.border-gray-300]="answers()[question.id] !== opt.key && (!showResults() || !quizSettings().showCorrectAnswers)"
+                          [class.text-gray-600]="answers()[question.id] !== opt.key && (!showResults() || !quizSettings().showCorrectAnswers)"
+                          [class.bg-green-600]="isOptCorrectInReview(question, opt.key)"
+                          [class.border-green-600]="isOptCorrectInReview(question, opt.key)"
+                          [class.bg-red-500]="isOptWrongInReview(question, opt.key)"
+                          [class.border-red-500]="isOptWrongInReview(question, opt.key)"
+                          [class.border-green-400]="correctUnselectedTF"
+                          [class.text-green-700]="correctUnselectedTF">
+                          {{ opt.key }}
+                        </span>
+                        @if (opt.contentBlocks?.length || opt.content) {
+                        <div class="flex-1 text-gray-700">
+                          <app-block-renderer [blocks]="opt.contentBlocks || []"></app-block-renderer>
+                        </div>
+                        }
+                        @if (isOptCorrectInReview(question, opt.key)) {
+                        <svg class="w-6 h-6 text-green-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd"
+                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                            clip-rule="evenodd"></path>
+                        </svg>
+                        }
+                        @if (isOptWrongInReview(question, opt.key)) {
+                        <svg class="w-6 h-6 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd"
+                            d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                            clip-rule="evenodd"></path>
+                        </svg>
+                        }
+                        @if (correctUnselectedTF) {
+                        <svg class="w-6 h-6 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"></path>
+                        </svg>
+                        }
+                      </div>
+                    </button>
+                    }
+                  </div>
+                }
+
+                <!-- FILL_IN_BLANK: Text input -->
+                @case ('FILL_IN_BLANK') {
+                  <div>
+                    <input type="text"
+                      [value]="getTextAnswer(question.id)"
+                      (input)="updateTextAnswer(question.id, $any($event.target).value)"
+                      [disabled]="showResults()"
+                      placeholder="Nhập câu trả lời..."
+                      class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-gray-700 focus:border-[#0056D2] focus:ring-2 focus:ring-[#0056D2]/20 transition-colors disabled:bg-gray-50 disabled:text-gray-500" />
+                    @if (showResults() && quizSettings().showCorrectAnswers && question.correctOption) {
+                    <p class="mt-2 text-sm text-green-700">
+                      <span class="font-medium">Đáp án đúng:</span> {{ question.correctOption }}
+                    </p>
+                    }
+                  </div>
+                }
+
+                <!-- SHORT_ANSWER: Text input (larger) -->
+                @case ('SHORT_ANSWER') {
+                  <div>
+                    <input type="text"
+                      [value]="getTextAnswer(question.id)"
+                      (input)="updateTextAnswer(question.id, $any($event.target).value)"
+                      [disabled]="showResults()"
+                      placeholder="Nhập câu trả lời ngắn..."
+                      class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-gray-700 focus:border-[#0056D2] focus:ring-2 focus:ring-[#0056D2]/20 transition-colors disabled:bg-gray-50 disabled:text-gray-500" />
+                    @if (showResults() && quizSettings().showCorrectAnswers && question.correctOption) {
+                    <p class="mt-2 text-sm text-green-700">
+                      <span class="font-medium">Đáp án đúng:</span> {{ question.correctOption }}
+                    </p>
+                    }
+                  </div>
+                }
+
+                <!-- ESSAY: Textarea -->
+                @case ('ESSAY') {
+                  <div>
+                    <textarea
+                      [value]="getTextAnswer(question.id)"
+                      (input)="updateTextAnswer(question.id, $any($event.target).value)"
+                      [disabled]="showResults()"
+                      placeholder="Viết bài tự luận của bạn..."
+                      rows="8"
+                      class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-gray-700 focus:border-[#0056D2] focus:ring-2 focus:ring-[#0056D2]/20 transition-colors resize-y disabled:bg-gray-50 disabled:text-gray-500">
+                    </textarea>
+                    @if (showResults()) {
+                    <p class="mt-2 text-sm text-yellow-700 bg-yellow-50 p-3 rounded-lg">
+                      Bài tự luận sẽ được giáo viên chấm điểm thủ công.
+                    </p>
+                    }
+                  </div>
+                }
+
+                <!-- Fallback: Same as SINGLE_CHOICE -->
+                @default {
+                  <div class="space-y-3">
+                    @for (opt of question.options; track opt.key) {
+                    <button (click)="selectAnswer(question.id, opt.key)" [disabled]="showResults()"
+                      class="w-full text-left p-4 rounded-xl border-2 transition-all duration-200 group"
+                      [class.border-[#0056D2]]="answers()[question.id] === opt.key && (!showResults() || !quizSettings().showCorrectAnswers)"
+                      [class.bg-[#0056D2]/5]="answers()[question.id] === opt.key && (!showResults() || !quizSettings().showCorrectAnswers)"
+                      [class.border-gray-200]="answers()[question.id] !== opt.key && (!showResults() || !quizSettings().showCorrectAnswers)">
+                      <div class="flex items-center gap-4">
+                        <span class="w-10 h-10 rounded-xl flex items-center justify-center font-semibold text-sm"
+                          [class.bg-[#0056D2]]="answers()[question.id] === opt.key && (!showResults() || !quizSettings().showCorrectAnswers)"
+                          [class.text-white]="answers()[question.id] === opt.key && (!showResults() || !quizSettings().showCorrectAnswers)"
+                          [class.bg-gray-100]="answers()[question.id] !== opt.key && (!showResults() || !quizSettings().showCorrectAnswers)"
+                          [class.text-gray-600]="answers()[question.id] !== opt.key && (!showResults() || !quizSettings().showCorrectAnswers)">
+                          {{ opt.key }}
+                        </span>
+                        @if (opt.contentBlocks?.length || opt.content) {
+                        <div class="flex-1 text-gray-700">
+                          <app-block-renderer [blocks]="opt.contentBlocks || []"></app-block-renderer>
+                        </div>
+                        }
+                      </div>
+                    </button>
+                    }
+                  </div>
+                }
+              }
+            </div>
+          </div>
+          }
+        </div>
+
+        <!-- Page Navigation -->
+        <div class="mt-8 flex items-center justify-between">
+          <button (click)="prevPage()" [disabled]="currentPage() === 0"
+            class="flex items-center gap-2 px-5 py-3 bg-white border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+            </svg>
+            10 câu trước
+          </button>
+
+          <!-- Page Numbers -->
+          <div class="flex items-center gap-2">
+            @for (page of [].constructor(totalPages()); track $index; let i = $index) {
+            <button (click)="goToPage(i)" class="w-10 h-10 rounded-lg text-sm font-medium transition-colors"
+              [class.bg-[#0056D2]]="i === currentPage()" [class.text-white]="i === currentPage()"
+              [class.bg-gray-100]="i !== currentPage()" [class.text-gray-600]="i !== currentPage()"
+              [class.hover:bg-gray-200]="i !== currentPage()">
+              {{ i + 1 }}
+            </button>
+            }
+          </div>
+
+          @if (currentPage() < totalPages() - 1) { <button (click)="nextPage()"
+            class="flex items-center gap-2 px-5 py-3 bg-[#0056D2] text-white rounded-xl hover:bg-[#004BB5] transition-colors">
+            10 câu tiếp
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
+            </button>
+            } @else if (!showResults()) {
+            <button (click)="goToReview()"
+              class="flex items-center gap-2 px-5 py-3 bg-[#0056D2] text-white rounded-xl hover:bg-[#004BB5] transition-colors disabled:opacity-50"
+              [disabled]="submitting()">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+              </svg>
+              Nộp bài
+            </button>
+            } @else {
+            <button (click)="goBack()"
+              class="flex items-center gap-2 px-5 py-3 bg-[#0056D2] text-white rounded-xl hover:bg-[#004BB5] transition-colors">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+              </svg>
+              Quay lại
+            </button>
+            }
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== MOBILE BOTTOM NAV BAR (lg:hidden) ==================== -->
+    @if (quizPhase() === 'in-progress' || quizPhase() === 'submitting') {
+    <div class="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 shadow-lg safe-area-inset-bottom">
+      <div class="px-4 py-3 flex items-center gap-3">
+        <!-- Timer chip -->
+        @if (hasActiveTimeConstraint()) {
+        <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg shrink-0"
+          [class.bg-[#0056D2]/5]="timeRemaining() > timerWarnThreshold()"
+          [class.bg-yellow-50]="timeRemaining() <= timerWarnThreshold() && timeRemaining() > timerDangerThreshold()"
+          [class.bg-red-50]="timeRemaining() <= timerDangerThreshold()">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            [class.text-[#0056D2]]="timeRemaining() > timerWarnThreshold()"
+            [class.text-yellow-600]="timeRemaining() <= timerWarnThreshold() && timeRemaining() > timerDangerThreshold()"
+            [class.text-red-600]="timeRemaining() <= timerDangerThreshold()">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <span class="font-mono font-semibold text-sm"
+            [class.text-[#004BB5]]="timeRemaining() > timerWarnThreshold()"
+            [class.text-yellow-600]="timeRemaining() <= timerWarnThreshold() && timeRemaining() > timerDangerThreshold()"
+            [class.text-red-600]="timeRemaining() <= timerDangerThreshold()">{{ formatTime(timeRemaining()) }}</span>
+        </div>
+        }
+
+        <!-- Progress + open drawer button -->
+        <button (click)="mobileNavDrawerOpen.set(true)"
+          class="flex items-center gap-2 flex-1 px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 active:bg-gray-300 transition-colors">
+          <svg class="w-4 h-4 text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+          </svg>
+          <span class="text-sm text-gray-700">
+            <span class="font-semibold text-[#0056D2]">{{ answeredCount() }}</span> / {{ questions().length }} câu
+          </span>
+        </button>
+
+        <!-- Submit shortcut -->
+        <button (click)="goToReview()"
+          class="px-4 py-2 bg-[#0056D2] text-white text-sm font-semibold rounded-lg hover:bg-[#004BB5] active:bg-[#003A8C] transition-colors disabled:opacity-50 shrink-0"
+          [disabled]="submitting()">
+          @if (submitting()) { Đang nộp... } @else { Nộp bài }
+        </button>
+      </div>
+    </div>
+    }
+
+    <!-- ==================== MOBILE NAV DRAWER (slide-up) ==================== -->
+    @if (mobileNavDrawerOpen()) {
+    <div class="lg:hidden fixed inset-0 z-50 flex flex-col justify-end">
+      <!-- Backdrop -->
+      <div class="absolute inset-0 bg-black/40" (click)="mobileNavDrawerOpen.set(false)"></div>
+      <!-- Panel -->
+      <div class="relative bg-white rounded-t-2xl shadow-xl max-h-[80vh] flex flex-col">
+        <!-- Drag handle -->
+        <div class="flex justify-center pt-3 pb-1 shrink-0">
+          <div class="w-10 h-1 bg-gray-300 rounded-full"></div>
+        </div>
+        <!-- Header -->
+        <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between shrink-0">
+          <h3 class="font-semibold text-gray-900">Điều hướng câu hỏi</h3>
+          <button (click)="mobileNavDrawerOpen.set(false)"
+            class="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+        <!-- Scrollable content -->
+        <div class="overflow-y-auto p-5">
+          <!-- Progress summary -->
+          <div class="flex items-center justify-between mb-4">
+            <span class="text-sm text-gray-600">Đã trả lời: <span class="font-semibold text-[#0056D2]">{{ answeredCount() }}</span> / {{ questions().length }}</span>
+            @if (hasActiveTimeConstraint()) {
+            <span class="text-sm font-mono font-semibold"
+              [class.text-[#004BB5]]="timeRemaining() > timerWarnThreshold()"
+              [class.text-yellow-600]="timeRemaining() <= timerWarnThreshold() && timeRemaining() > timerDangerThreshold()"
+              [class.text-red-600]="timeRemaining() <= timerDangerThreshold()">
+              ⏱ {{ formatTime(timeRemaining()) }}
+            </span>
+            }
+          </div>
+          <!-- Question grid -->
+          <div class="grid grid-cols-6 sm:grid-cols-8 gap-2 mb-5">
+            @for (q of questions(); track q.id; let i = $index) {
+            @let isCurrent = i === currentQuestionIndex();
+            @let answered = isAnswered(q.id);
+            <button (click)="goToQuestion(i); mobileNavDrawerOpen.set(false)"
+              class="w-10 h-10 rounded-lg text-sm font-medium transition-all duration-150 flex items-center justify-center relative"
+              [class.ring-2]="isCurrent"
+              [class.ring-[#0056D2]]="isCurrent"
+              [class.bg-[#0056D2]/10]="answered"
+              [class.text-[#004BB5]]="answered && !isCurrent"
+              [class.bg-gray-100]="!answered"
+              [class.text-gray-600]="!answered && !isCurrent">
+              {{ i + 1 }}
+              @if (isFlagged(q.id)) {
+              <span class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-400 rounded-full border border-white"></span>
+              }
+            </button>
+            }
+          </div>
+          <!-- Legend -->
+          <div class="flex items-center gap-5 text-xs text-gray-500 mb-5">
+            <div class="flex items-center gap-1.5">
+              <div class="w-4 h-4 rounded bg-[#0056D2]/10 ring-2 ring-[#0056D2]"></div>
+              Hiện tại
+            </div>
+            <div class="flex items-center gap-1.5">
+              <div class="w-4 h-4 rounded bg-[#0056D2]/10"></div>
+              Đã trả lời
+            </div>
+            <div class="flex items-center gap-1.5">
+              <div class="w-4 h-4 rounded bg-gray-100"></div>
+              Chưa trả lời
+            </div>
+          </div>
+          <!-- Submit button -->
+          <button (click)="mobileNavDrawerOpen.set(false); goToReview()"
+            class="w-full py-3 bg-[#0056D2] text-white font-semibold rounded-xl hover:bg-[#004BB5] transition-colors disabled:opacity-50"
+            [disabled]="submitting()">
+            @if (submitting()) { Đang nộp... } @else { Xem tổng quan & Nộp bài }
+          </button>
+        </div>
+      </div>
+    </div>
+    }
+
+  </div>
+
+  <!-- Results Modal -->
+  @if (showResults() && showResultsModal()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+    (keydown.escape)="quizSettings().showCorrectAnswers ? closeResults() : null">
+    <div class="bg-white rounded-xl shadow-lg max-w-lg w-full overflow-hidden animate-scale-in">
+      <!-- Result Header — green on pass, red on fail -->
+      <div class="p-6 text-center"
+        [class.bg-green-600]="isPassed()"
+        [class.bg-red-600]="!isPassed()">
+        <div class="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
+          @if (isPassed()) {
+          <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          } @else {
+          <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          }
+        </div>
+        <h2 class="text-2xl font-bold text-white mb-1">
+          @if (isPassed()) { Xuất sắc! } @else { Chưa đạt }
+        </h2>
+        <p class="text-white/80">
+          @if (isPassed()) {
+            Bạn đã vượt qua bài kiểm tra
+          } @else {
+            Cần đạt {{ quizSettings().passingScore }}% để qua môn
+          }
+        </p>
+      </div>
+
+      <!-- Score Display -->
+      <div class="p-6">
+        <div class="text-center mb-6">
+          @if (serverScore() !== null) {
+          <div class="text-5xl font-bold mb-1"
+            [class.text-green-700]="isPassed()"
+            [class.text-red-700]="!isPassed()">
+            {{ serverScore() }}<span class="text-2xl text-gray-400">/{{ serverMaxScore() }}</span>
+          </div>
+          <p class="text-gray-500">Điểm số</p>
+          } @else {
+          <div class="text-5xl font-bold mb-1"
+            [class.text-green-700]="isPassed()"
+            [class.text-red-700]="!isPassed()">{{ scorePercent() }}%</div>
+          <p class="text-gray-500">Điểm ước tính</p>
+          }
+        </div>
+
+        <!-- Score bar with passing threshold marker -->
+        <div class="relative mb-6 mt-2">
+          <div class="h-2.5 bg-gray-200 rounded-full overflow-hidden">
+            <div class="h-full rounded-full transition-all duration-700"
+              [class.bg-green-500]="isPassed()"
+              [class.bg-red-500]="!isPassed()"
+              [style.width.%]="Math.min(scorePercent(), 100)"></div>
+          </div>
+          <!-- Passing threshold marker line -->
+          <div class="absolute top-0 w-0.5 h-5 bg-gray-600 -translate-y-1/4 rounded-full"
+            [style.left.%]="quizSettings().passingScore"></div>
+          <div class="absolute top-5 text-[10px] font-medium text-gray-500 -translate-x-1/2"
+            [style.left.%]="quizSettings().passingScore">{{ quizSettings().passingScore }}%</div>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="grid grid-cols-3 gap-4 mb-5 mt-4">
+          <div class="bg-green-50 rounded-xl p-4 text-center">
+            <div class="text-2xl font-bold text-green-700">{{ correctCount() }}</div>
+            <div class="text-xs text-green-600">Đúng</div>
+          </div>
+          <div class="bg-red-50 rounded-xl p-4 text-center">
+            <div class="text-2xl font-bold text-red-700">{{ wrongCount() }}</div>
+            <div class="text-xs text-red-600">Sai</div>
+          </div>
+          <div class="bg-slate-50 rounded-xl p-4 text-center">
+            <div class="text-2xl font-bold text-gray-500">{{ unansweredCount() }}</div>
+            <div class="text-xs text-gray-400">Bỏ qua</div>
+          </div>
+        </div>
+
+        <!-- Time Spent -->
+        <div class="bg-slate-50 rounded-xl p-3 flex items-center justify-between mb-5">
+          <div class="flex items-center gap-2 text-gray-500">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <span class="text-sm">Thời gian làm bài</span>
+          </div>
+          <span class="font-mono font-semibold text-gray-700">{{ formatTime(timeSpent()) }}</span>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex flex-col gap-3">
+          <!-- Retake: shown when attempts remain -->
+          @if (preflightData()?.attemptsRemaining && preflightData()!.attemptsRemaining! > 0) {
+          <button (click)="retakeQuiz()"
+            class="w-full px-4 py-3 bg-[#0056D2] text-white rounded-xl hover:bg-[#004BB5] transition-colors font-medium flex items-center justify-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+            Làm lại (còn {{ preflightData()!.attemptsRemaining }} lần)
+          </button>
+          <button (click)="goBack()"
+            class="w-full px-4 py-2.5 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded-xl transition-colors font-medium">
+            Quay lại
+          </button>
+          } @else {
+          <button (click)="goBack()"
+            class="w-full px-4 py-3 bg-[#0056D2] text-white rounded-xl hover:bg-[#004BB5] transition-colors font-medium">
+            Quay lại
+          </button>
+          }
+          @if (quizSettings().showCorrectAnswers) {
+          <button (click)="closeResults()"
+            class="w-full px-4 py-2.5 text-sm text-gray-600 hover:text-gray-800 transition-colors font-medium">
+            Xem lại đáp án
+          </button>
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+  }
+  }
+</div>

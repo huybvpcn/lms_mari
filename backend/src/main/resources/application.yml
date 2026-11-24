@@ -1,0 +1,144 @@
+# ==== Common ====
+server:
+  shutdown: graceful
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+      force-response: true
+  compression:
+    enabled: true
+    mime-types: text/html,text/xml,text/plain,text/css,text/javascript,application/javascript,application/json,text/event-stream
+    min-response-size: 256
+
+spring:
+  application:
+    name: backend-lms-postgres
+  threads:
+    virtual:
+      enabled: true
+  task:
+    scheduling:
+      pool:
+        size: 4
+      thread-name-prefix: lms-scheduler-
+  profiles:
+    active: dev
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 500MB
+      max-request-size: 520MB
+  jpa:
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+        dialect.native_param_markers: false
+        # Hypersistence-utils config (custom ObjectMapper + JsonSerializer for Phase 8 L3)
+        # is loaded from classpath: backend/src/main/resources/hypersistence-utils.properties
+        # NOT from this YAML — hypersistence reads only from its own properties file +
+        # System properties + Hibernate Environment, NOT from spring.jpa.properties.*.
+        # See JsonbSerializableTest.java (Layer 2) for the build-time guard.
+  flyway:
+    enabled: true
+    baseline-on-migrate: true  # Required for existing databases
+    baseline-version: 25       # Baseline after V25, apply V26+ migrations
+    locations: classpath:db/migration
+    validate-on-migrate: true
+    out-of-order: true         # Allow V26, V27 to run after V20251221
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,info"
+
+logging:
+  level:
+    root: INFO
+    com.example.lms: ${LOGGING_LEVEL_COM_EXAMPLE_LMS:INFO}
+    org.hibernate.SQL: ${LOGGING_LEVEL_ORG_HIBERNATE_SQL:WARN}
+    org.hibernate.orm.jdbc.bind: ${LOGGING_LEVEL_ORG_HIBERNATE_ORM_JDBC_BIND:WARN}
+    org.springframework.orm.jpa: ${LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_ORM_JPA:INFO}
+    org.springframework.transaction: ${LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_TRANSACTION:INFO}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui
+    operationsSorter: method
+    tagsSorter: alpha
+    displayRequestDuration: true
+
+# JWT Configuration - Externalized for security
+app:
+  jwt:
+    secret: ${APP_JWT_SECRET}
+    expiration: ${APP_JWT_EXPIRATION:86400000}  # 24 hours in milliseconds
+    refresh-expiration: ${APP_JWT_REFRESH_EXPIRATION:604800000}  # 7 days in milliseconds
+  auth:
+    google:
+      enabled: ${GOOGLE_AUTH_ENABLED:false}
+      web-client-id: ${GOOGLE_WEB_CLIENT_ID:}
+      # Server-side authorization code flow (Wiii-style redirect). When enabled, the FE
+      # navigates the browser to GET /api/v3/auth/google/authorize, which redirects to
+      # Google. Google sends the user back to /api/v3/auth/google/callback, the BE
+      # exchanges the code for tokens, and forwards the user to FRONTEND_CALLBACK with
+      # the LMS JWT in the URL fragment.
+      redirect-flow-enabled: ${GOOGLE_OAUTH_REDIRECT_FLOW_ENABLED:false}
+      client-secret: ${GOOGLE_CLIENT_SECRET:}
+      # Must match exactly the "Authorized redirect URI" in Google Cloud Console.
+      redirect-uri: ${GOOGLE_OAUTH_REDIRECT_URI:}
+      # Where the BE forwards the browser after the callback succeeds. The JWT is
+      # carried in the URL fragment (#token=...) so it never hits the access log.
+      frontend-callback-uri: ${GOOGLE_OAUTH_FRONTEND_CALLBACK:}
+  video:
+    ingest:
+      enabled: ${VIDEO_INGEST_ENABLED:true}
+    playback-token-expiry-seconds: ${VIDEO_PLAYBACK_TOKEN_EXPIRY_SECONDS:14400}
+    segment-presign-ttl-seconds: ${VIDEO_SEGMENT_PRESIGN_TTL_SECONDS:120}
+    media-domain: ${VIDEO_MEDIA_DOMAIN:}
+    edge-auth-mode: ${VIDEO_EDGE_AUTH_MODE:disabled}
+    edge-hmac-secret: ${VIDEO_EDGE_HMAC_SECRET:}
+    edge-token-expiry-seconds: ${VIDEO_EDGE_TOKEN_EXPIRY_SECONDS:300}
+    manifest-cache-seconds: ${VIDEO_MANIFEST_CACHE_SECONDS:60}
+    object-redirect-cache-seconds: ${VIDEO_OBJECT_REDIRECT_CACHE_SECONDS:30}
+    package-upload-concurrency: ${VIDEO_PACKAGE_UPLOAD_CONCURRENCY:6}
+    adaptive-segment-duration-seconds: ${VIDEO_ADAPTIVE_SEGMENT_DURATION_SECONDS:6}
+    ffmpeg-preset: ${VIDEO_FFMPEG_PRESET:veryfast}
+    offline-profiles: ${VIDEO_OFFLINE_PROFILES:SAVER,STANDARD,HIGH}
+    adaptive-profiles: ${VIDEO_ADAPTIVE_PROFILES:SAVER,STANDARD,HIGH}
+    retain-source-after-ready: ${VIDEO_RETAIN_SOURCE_AFTER_READY:true}
+
+# Wiii AI Integration (Sprint 175: "Cắm Phích Cắm")
+wiii:
+  webhook:
+    url: ${WIII_WEBHOOK_URL:http://localhost:8000/api/v1/lms/webhook/maritime-lms}
+    secret: ${WIII_WEBHOOK_SECRET:}
+    enabled: ${WIII_WEBHOOK_ENABLED:false}
+    timeout: ${WIII_WEBHOOK_TIMEOUT:10}
+    retry-max: ${WIII_WEBHOOK_RETRY_MAX:2}
+  token-exchange:
+    url: ${WIII_TOKEN_EXCHANGE_URL:http://localhost:8000/api/v1/auth/lms/token}
+  service-token: ${WIII_SERVICE_TOKEN:}
+
+# Cloudflare R2 Storage Configuration - Externalized for security
+# R2 is S3-compatible object storage with zero egress fees
+cloudflare:
+  r2:
+    enabled: ${CLOUDFLARE_R2_ENABLED:false}
+    account-id: ${CLOUDFLARE_R2_ACCOUNT_ID:}
+    access-key: ${CLOUDFLARE_R2_ACCESS_KEY:}
+    secret-key: ${CLOUDFLARE_R2_SECRET_KEY:}
+    endpoint: ${CLOUDFLARE_R2_ENDPOINT:}
+    region: ${CLOUDFLARE_R2_REGION:auto}
+    path-style-access: ${CLOUDFLARE_R2_PATH_STYLE_ACCESS:true}
+    bucket: ${CLOUDFLARE_R2_BUCKET:lms-tracnghiemj-image}
+    video-bucket: ${CLOUDFLARE_R2_VIDEO_BUCKET:lms-storage}
+    simulation-bucket: ${CLOUDFLARE_R2_SIMULATION_BUCKET:lms-storage}
+    simulation-public-url: ${CLOUDFLARE_R2_SIMULATION_PUBLIC_URL:/simulations}
+    simulation-prefix: ${CLOUDFLARE_R2_SIMULATION_PREFIX:simulations}
+    public-url: ${CLOUDFLARE_R2_PUBLIC_URL:}

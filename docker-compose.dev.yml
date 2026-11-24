@@ -1,0 +1,77 @@
+# =============================================================================
+# Development Environment - Override Configuration
+# Usage: cp .env.dev.example .env && docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# =============================================================================
+
+services:
+  db:
+    ports:
+      - "127.0.0.1:5432:5432"  # Bind to loopback only for local tools
+    # Dev: limit PostgreSQL to prevent WSL OOM on 16GB machines
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  backend:
+    ports:
+      - "127.0.0.1:8088:8080"  # Host-facing dev API port; container listens on 8080
+    volumes:
+      - ./backend/uploads:/app/uploads  # Persist uploads locally
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      APP_STORAGE_LOCAL_BASE_URL: http://localhost:8088/uploads
+      LOGGING_LEVEL_COM_EXAMPLE_LMS: INFO
+      LOGGING_LEVEL_ORG_HIBERNATE_SQL: WARN
+      LOGGING_LEVEL_ORG_HIBERNATE_ORM_JDBC_BIND: WARN
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB: INFO
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_ORM_JPA: INFO
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_TRANSACTION: INFO
+      # JVM: respect container memory limit (512MB heap max inside 1GB container)
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=60.0 -XX:+ExitOnOutOfMemoryError -Xss512k"
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+
+  gotenberg:
+    ports:
+      - "127.0.0.1:3000:3000"
+    networks:
+      - lms-backend
+      - lms-frontend
+
+  frontend:
+    ports:
+      - "127.0.0.1:4200:80"
+
+  # ===== pgAdmin (Dev Only) =====
+  pgadmin:
+    profiles:
+      - devtools
+    image: dpage/pgadmin4:latest
+    ports:
+      - "8081:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@lms.vn}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin123}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    volumes:
+      - lms-pgadmin:/var/lib/pgadmin
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - lms-backend
+      - lms-frontend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/misc/ping || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  lms-pgadmin:
+    name: lms-pgadmin

@@ -1,0 +1,98 @@
+:host :where(input, textarea)::placeholder {
+  color: #94a3b8;
+  opacity: 1;
+}
+
+.interactive-timeline-dot {
+  cursor: grab;
+  z-index: 2;
+  transition:
+    transform 140ms ease,
+    box-shadow 140ms ease,
+    background-color 140ms ease;
+}
+
+.interactive-timeline-dot[aria-current='true'] {
+  transform: translate(-50%, -50%) scale(1.08);
+  box-shadow: 0 8px 18px rgba(0, 86, 210, 0.22);
+}
+
+.interactive-timeline-dot--selected {
+  transform: translate(-50%, -50%) scale(1.1);
+  box-shadow:
+    0 0 0 4px rgba(0, 86, 210, 0.14),
+    0 10px 22px rgba(0, 86, 210, 0.24);
+}
+
+.interactive-timeline-dot--dragging {
+  cursor: grabbing;
+}
+
+.interactive-timeline-dot:hover,
+.interactive-timeline-dot:focus-visible {
+  transform: translate(-50%, -50%) scale(1.08);
+  box-shadow: 0 8px 18px rgba(0, 86, 210, 0.22);
+}
+
+.interactive-timeline-preview {
+  position: absolute;
+  top: 0.25rem;
+  z-index: 3;
+  display: flex;
+  max-width: min(16rem, 55vw);
+  transform: translate(-50%, -100%);
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.14);
+  padding: 0.35rem 0.55rem;
+  pointer-events: none;
+  animation: timeline-preview-in 120ms ease-out;
+}
+
+@keyframes timeline-preview-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-100% + 4px));
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, -100%);
+  }
+}
+
+.interactive-detail-card {
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.interactive-detail-card--selected {
+  background: linear-gradient(180deg, rgba(0, 86, 210, 0.055), rgba(248, 250, 252, 0.92));
+  box-shadow:
+    inset 4px 0 0 #0056d2,
+    0 14px 32px rgba(15, 23, 42, 0.08);
+}
+
+.interactive-drag-drop-zone {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.interactive-drag-drop-zone:active {
+  cursor: grabbing;
+}
+
+.interactive-drag-drop-resize-handle {
+  cursor: nwse-resize;
+  touch-action: none;
+}

@@ -1,0 +1,387 @@
+import { Injectable, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { ApiClient } from './api-client';
+import { ApiResponse } from '../types/common.types';
+import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
+
+export type AssignmentStatus = 'DRAFT' | 'PUBLISHED' | 'CLOSED' | 'pending' | 'published' | 'closed';
+
+export interface CreateAssignmentRequest {
+  title: string;
+  description?: string;
+  instructions?: string;
+  dueDate?: string; // ISO string
+  maxScore?: number;
+  lessonId?: string;
+  attachments?: {
+    fileId: string;
+    fileName: string;
+    fileUrl: string;
+  }[];
+  classId?: string;
+  status?: AssignmentStatus;
+  distributionType?: 'CLASS' | 'SPECIFIC_STUDENTS' | 'ALL_STUDENTS';
+  studentIds?: string[]; // IDs of specific students if creating for specific students
+  assignmentConfig?: Record<string, any>;
+}
+
+export interface UpdateAssignmentRequest {
+  title?: string;
+  description?: string;
+  instructions?: string;
+  dueDate?: string;
+  maxScore?: number;
+  classId?: string;
+  status?: AssignmentStatus;
+  studentIds?: string[]; // IDs for specific student allocation
+  distributionType?: 'CLASS' | 'SPECIFIC_STUDENTS' | 'ALL_STUDENTS';
+  assignmentConfig?: Record<string, any>;
+}
+
+export interface AssignmentSummary {
+  id: string;
+  title: string;
+  description?: string;
+  dueDate?: string;
+  courseId: string;
+  courseTitle: string;
+  deliveryMode?: 'SELF_PACED' | 'INSTRUCTOR_LED';
+  status: AssignmentStatus;
+  submissionsCount: number;
+  totalStudents: number;
+  classId?: string;
+  className?: string;
+  distributionType?: 'CLASS' | 'SPECIFIC_STUDENTS' | 'ALL_STUDENTS';
+  gradedCount: number;
+  pendingCount: number;
+  averageScore?: number;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface AssignmentDetail {
+  id: string;
+  lessonId?: string;
+  title: string;
+  description?: string;
+  instructions?: string;
+  dueDate?: string;
+  courseId: string;
+  courseTitle: string;
+  deliveryMode?: 'SELF_PACED' | 'INSTRUCTOR_LED';
+  status: AssignmentStatus;
+  submissionsCount: number;
+  totalStudents: number;
+  classId?: string;
+  className?: string;
+  allocatedStudentIds?: string[];
+  distributionType?: 'CLASS' | 'SPECIFIC_STUDENTS' | 'ALL_STUDENTS';
+  createdAt: string;
+  updatedAt?: string;
+  maxScore?: number;
+  assignmentConfig?: Record<string, any>;
+  attachments?: {
+    fileId: string;
+    fileName: string;
+    fileUrl: string;
+  }[];
+  /** Teacher uploaded standalone instruction files (Google Classroom pattern). */
+  instructionAttachments?: {
+    id: string;
+    fileName: string;
+    fileUrl: string;
+    fileSize: number | null;
+    fileType: string | null;
+    storageKey: string | null;
+    displayOrder: number;
+    uploadedAt: string | null;
+  }[];
+}
+
+export interface SubmissionSummary {
+  id: string;
+  studentId: string;
+  studentName: string;
+  studentEmail: string;
+  studentAvatar?: string;
+  submittedAt?: string;
+  gradedAt?: string;
+  status: 'pending' | 'submitted' | 'graded' | 'late' | 'PENDING' | 'SUBMITTED' | 'GRADED' | 'LATE_SUBMISSION';
+  grade?: number | SubmissionGrade;
+  score?: number; // Direct score from backend (BigDecimal)
+  maxGrade?: number; // Max grade from backend assignment
+  feedback?: string;
+}
+
+export interface SubmissionAttachment {
+  id: string;
+  fileName: string;
+  fileUrl: string;
+  mimeType?: string;
+  fileSize?: number;
+  metadata?: Record<string, unknown>;
+}
+
+export interface SubmissionGrade {
+  score: number;
+  maxScore: number;
+  percentage: number;
+  feedback?: string;
+  rubricGrades?: RubricGradeItem[];
+  gradedAt: string;
+  gradedBy: string;
+}
+
+export interface SubmissionDetail extends Omit<SubmissionSummary, 'grade'> {
+  content?: string;
+  attachments?: SubmissionAttachment[];
+  assignmentId?: string;
+  assignmentTitle?: string;
+  maxScore?: number;
+  dueDate?: string;
+  isLate?: boolean;
+  gradedAt?: string;
+  gradedByName?: string; // Teacher full name resolved by backend
+  grade?: SubmissionGrade; // Override to only accept SubmissionGrade object
+  score?: number; // Direct score from backend (BigDecimal)
+  attemptNumber?: number; // Submission attempt count
+}
+
+export interface AuditLogEntry {
+  id: string;
+  action: string;
+  userId: string;
+  userName: string;
+  studentName: string;
+  oldValue?: string;
+  newValue?: string;
+  reason?: string;
+  timestamp: string;
+}
+
+export interface CreateSubmissionRequest {
+  content?: string;
+  attachments?: string[];
+}
+
+export interface RubricGradeItem {
+  criterionId: string;
+  criterionName?: string;
+  criterionMaxPoints?: number;
+  levelId: string;
+  levelLabel?: string;
+  levelPoints?: number;
+  score: number;
+  comment?: string;
+  rubricId?: string;
+}
+
+export interface GradeSubmissionRequest {
+  score: number;
+  maxScore?: number;
+  feedback?: string;
+  rubricGrades?: RubricGradeItem[];
+}
+
+@Injectable({ providedIn: 'root' })
+export class AssignmentApi {
+  private api = inject(ApiClient);
+  private http = inject(HttpClient);
+
+  // Get assignments by course
+  getAssignmentsByCourse(courseId: string, params?: { page?: number; limit?: number }) {
+    return this.api.getWithResponse<any>(`/api/v3/teacher/assignments/courses/${courseId}`, { params }).pipe(
+      map((res: ApiResponse<any>) => {
+        // BE returns List (not Page), so data is directly an array
+        const content: AssignmentSummary[] = Array.isArray(res?.data) ? res.data : (res?.data?.content ?? []);
+        return {
+          data: content,
+          pagination: res?.pagination,
+          message: res?.message
+        } as ApiResponse<AssignmentSummary[]>;
+      })
+    );
+  }
+
+  // Create assignment
+  createAssignment(courseId: string, payload: CreateAssignmentRequest) {
+    return this.api.postWithResponse<AssignmentDetail>(`/api/v3/teacher/assignments/courses/${courseId}`, payload);
+  }
+
+  // Get assignment detail
+  getAssignmentById(assignmentId: string) {
+    return this.api.getWithResponse<AssignmentDetail>(`/api/v3/teacher/assignments/${assignmentId}`);
+  }
+
+  getAssignmentByLessonId(lessonId: string) {
+    return this.api.getWithResponse<AssignmentDetail>(`/api/v3/teacher/assignments/lessons/${lessonId}`);
+  }
+
+  // Update assignment
+  updateAssignment(assignmentId: string, payload: UpdateAssignmentRequest) {
+    return this.api.putWithResponse<AssignmentDetail>(`/api/v3/teacher/assignments/${assignmentId}`, payload);
+  }
+
+  // Delete assignment
+  deleteAssignment(assignmentId: string) {
+    return this.api.deleteWithResponse<string>(`/api/v3/teacher/assignments/${assignmentId}`);
+  }
+
+  // Publish assignment
+  publishAssignment(assignmentId: string) {
+    return this.api.putWithResponse<AssignmentDetail>(`/api/v3/assignments/${assignmentId}/publish`, {});
+  }
+
+  // Get submissions by assignment
+  getSubmissionsByAssignment(assignmentId: string, params?: { page?: number; limit?: number; status?: string }) {
+    return this.api.getWithResponse<any>(`/api/v3/assignments/${assignmentId}/submissions`, { params }).pipe(
+      map((res: ApiResponse<any>) => {
+        // BE returns List (not Page), so data is directly an array
+        const content: SubmissionSummary[] = Array.isArray(res?.data) ? res.data : (res?.data?.content ?? []);
+        return {
+          data: content,
+          pagination: res?.pagination,
+          message: res?.message
+        } as ApiResponse<SubmissionSummary[]>;
+      })
+    );
+  }
+
+  // Submit assignment (student)
+  submitAssignment(assignmentId: string, payload: CreateSubmissionRequest) {
+    return this.api.postWithResponse<SubmissionDetail>(`/api/v3/assignments/${assignmentId}/submissions`, payload);
+  }
+
+  // Get my submission (student)
+  getMySubmission(assignmentId: string) {
+    return this.api.getWithResponse<SubmissionDetail>(`/api/v3/assignments/${assignmentId}/my-submission`);
+  }
+
+  // Grade submission (teacher)
+  gradeSubmission(submissionId: string, payload: GradeSubmissionRequest) {
+    return this.api.patchWithResponse<SubmissionDetail>(`/api/v3/submissions/${submissionId}/grade`, payload);
+  }
+
+  // Get submission detail by ID (teacher)
+  getSubmissionById(submissionId: string) {
+    return this.api.getWithResponse<SubmissionDetail>(`/api/v3/submissions/${submissionId}`);
+  }
+
+  // Export submissions as Excel (teacher)
+  exportSubmissions(assignmentId: string): Observable<Blob> {
+    return this.http.get(`/api/v3/assignments/${assignmentId}/submissions/export`, {
+      responseType: 'blob'
+    });
+  }
+
+  // Get submissions for grading (alias for getSubmissionsByAssignment with full details)
+  getSubmissions(assignmentId: string, params?: { page?: number; limit?: number; status?: string }) {
+    return this.api.getWithResponse<SubmissionDetail[]>(`/api/v3/assignments/${assignmentId}/submissions/details`, { params });
+  }
+
+  // Get all pending submissions across all assignments (for grading dashboard)
+  getPendingSubmissions(params?: { page?: number; limit?: number }) {
+    return this.api.getWithResponse<SubmissionDetail[]>(`/api/v3/submissions/pending`, { params });
+  }
+
+  // Get all teacher assignments (for management view)
+  getTeacherAssignments(params?: { page?: number; limit?: number; courseId?: string; status?: string }) {
+    return this.api.getWithResponse<AssignmentSummary[]>(`/api/v3/teacher/assignments/summary`, { params });
+  }
+
+  // Batch grade multiple submissions
+  batchGradeSubmissions(assignmentId: string, items: { submissionId: string; grade: number; feedback?: string }[]) {
+    return this.api.patchWithResponse<{ gradedCount: number }>(
+      `/api/v3/assignments/${assignmentId}/submissions/batch-grade`,
+      items
+    );
+  }
+
+  // Get grading audit log for an assignment (STCW compliance)
+  getAuditLog(assignmentId: string) {
+    return this.api.getWithResponse<AuditLogEntry[]>(`/api/v3/assignments/${assignmentId}/audit-log`);
+  }
+
+  // ===================== Student Endpoints =====================
+
+  // Get unified student tasks (assignments + quizzes + exams + practice)
+  getStudentTasks() {
+    return this.api.getWithResponse<StudentTaskApiResponse[]>('/api/v3/student/tasks');
+  }
+
+  // Get student's assignments across enrolled courses
+  getStudentAssignments() {
+    return this.api.getWithResponse<StudentAssignmentResponse[]>('/api/v3/student/assignments');
+  }
+
+  // Get student assignment detail
+  getStudentAssignmentDetail(assignmentId: string) {
+    return this.api.getWithResponse<StudentAssignmentResponse>(`/api/v3/student/assignments/${assignmentId}`);
+  }
+
+  // Submit assignment (student) — supports multi-file via attachments array
+  submitStudentAssignment(assignmentId: string, payload: Record<string, unknown>) {
+    return this.api.postWithResponse<{ submissionId: string; status: string }>(
+      `/api/v3/student/assignments/${assignmentId}/submit`,
+      payload
+    );
+  }
+
+  // Get my submission for specific assignment (student)
+  getStudentSubmission(assignmentId: string) {
+    return this.api.getWithResponse<any>(`/api/v3/student/assignments/${assignmentId}/submission`);
+  }
+}
+
+export interface StudentTaskApiResponse {
+  id: string;
+  workType: 'ASSIGNMENT' | 'QUIZ' | 'EXAM' | 'PRACTICE';
+  title: string;
+  description?: string;
+  courseId: string;
+  courseName: string;
+  dueDate?: string;
+  availableFrom?: string;    // Canvas "Available from" — quiz opens at this time
+  lockAt?: string;           // Canvas "Until" — hard deadline, no access after
+  status: string;
+  isLate: boolean;
+  score?: number;
+  maxScore?: number;
+  feedback?: string;
+  submissionId?: string;
+  submittedAt?: string;
+  fileUrl?: string;
+  fileName?: string;
+  attemptId?: string;
+  timeLimitMinutes?: number;
+  maxAttempts?: number;
+  questionCount?: number;
+  passingScore?: number;
+  isPassed?: boolean;
+  attemptCount?: number;
+  requiresPassword?: boolean;
+}
+
+export interface StudentAssignmentResponse {
+  id: string;
+  title: string;
+  description?: string;
+  instructions?: string;
+  courseName: string;
+  courseId: string;
+  dueDate?: string;
+  maxScore: number;
+  status: string; // NOT_SUBMITTED, SUBMITTED, GRADED, LATE, RESUBMITTED
+  isLate: boolean;
+  score?: number;
+  feedback?: string;
+  submittedAt?: string;
+  gradedAt?: string;
+  fileUrl?: string;
+  fileName?: string;
+  content?: string;
+  submissionId?: string;
+  allowLateSubmission: boolean;
+  maxAttempts: number;
+}

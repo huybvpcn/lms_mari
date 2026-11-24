@@ -1,0 +1,1443 @@
+import { Component, inject, OnInit, signal, computed, ChangeDetectionStrategy } from '@angular/core';
+
+import { FormsModule } from '@angular/forms';
+import { RouterModule, Router } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
+import { AuthService } from '../../core/services/auth.service';
+import { StudentEnrollmentService } from './services/enrollment.service';
+import { CourseApi } from '../../api/client/course.api';
+import { EnrolledCourse } from '../../shared/types/course.types';
+import { IconComponent } from '../../shared/components/ui/icon/icon.component';
+import { ButtonComponent } from '../../shared/components/ui/button/button.component';
+import { ToastService } from '../../core/services/toast.service';
+import { CourseDownloadButtonComponent } from '../../shared/components/course-download-button/course-download-button.component';
+import { CourseDownloadService } from '../../core/services/course-download.service';
+import { PaginationComponent } from '../../shared/components/pagination/pagination.component';
+
+// Enhanced course with modules
+interface LessonSection {
+  id: string;
+  title: string;
+  type: string;
+}
+
+interface EnhancedEnrolledCourse extends EnrolledCourse {
+  showModules?: boolean;
+  estimatedCompletion?: string;
+  currentLessonId?: string | null;
+  modules?: Array<{
+    id: string;
+    title: string;
+    completedCount?: number;
+    totalCount?: number;
+    lessons: Array<{
+      id: string;
+      title: string;
+      type: 'video' | 'reading' | 'quiz';
+      duration: string;
+      completed: boolean;
+      sections?: LessonSection[];
+    }>;
+  }>;
+}
+
+/**
+ * Student My Courses - Coursera Style with Modules
+ * 
+ * Trang khóa học với:
+ * - Coursera header (avatar + greeting)
+ * - Tab navigation (In Progress / Completed)
+ * - Course cards với dropdown modules
+ * - Responsive grid layout
+ */
+@Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  selector: 'app-student-my-courses',
+  imports: [
+    FormsModule,
+    RouterModule,
+    IconComponent,
+    ButtonComponent,
+    CourseDownloadButtonComponent,
+    PaginationComponent,
+  ],
+  template: `
+    <div class="my-courses-container">
+      <!-- Main Content Area (70%) -->
+      <div class="main-content">
+        @if (error()) {
+          <div style="background:#fef2f2;border:1px solid #fecaca;color:#991b1b;padding:12px 16px;border-radius:8px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">
+            <span>{{ error() }}</span>
+            <button (click)="error.set(null)" style="background:none;border:none;cursor:pointer;font-size:18px">&times;</button>
+          </div>
+        }
+        <!-- Page Header -->
+        <div class="page-header">
+          <h1 class="page-title">Tất cả khóa học</h1>
+          <p class="page-subtitle">Danh sách đầy đủ các khóa học đã đăng ký</p>
+        </div>
+
+        <!-- Search — matching Khám Phá design -->
+        @if (enrolledCourses().length > 5) {
+          <div class="search-bar">
+            <div class="search-wrapper">
+              <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              <input
+                type="text"
+                name="student-course-search"
+                placeholder="Tìm kiếm khóa học, giảng viên…"
+                [ngModel]="searchQuery()"
+                (ngModelChange)="onSearchChange($event)"
+                autocomplete="off"
+                aria-label="Tìm kiếm khóa học"
+                class="search-input">
+              @if (searchQuery()) {
+                <button class="search-clear" type="button" aria-label="Xóa tìm kiếm" (click)="onSearchChange('')">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+              }
+            </div>
+          </div>
+        }
+
+        <!-- Tabs -->
+        <div class="tabs-section">
+          <div class="tabs-container" role="tablist">
+            <button 
+              class="tab-chip"
+              [class.active]="activeTab() === 'in-progress'"
+              (click)="onTabChange('in-progress')"
+              role="tab"
+              [attr.aria-selected]="activeTab() === 'in-progress'"
+              type="button">
+              <span class="tab-label">Đang học ({{ inProgressCount() }})</span>
+            </button>
+            <button 
+              class="tab-chip"
+              [class.active]="activeTab() === 'completed'"
+              (click)="onTabChange('completed')"
+              role="tab"
+              [attr.aria-selected]="activeTab() === 'completed'"
+              type="button">
+              <span class="tab-label">Đã hoàn thành ({{ completedCount() }})</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Mobile sort + count (sidebar hidden on mobile) -->
+        <div class="mobile-toolbar">
+          <span class="mobile-count">{{ filteredCourses().length }} khóa học</span>
+          <select class="mobile-sort" name="student-course-sort-mobile" aria-label="Sắp xếp khóa học" [value]="sortBy()" (change)="onSortChange($event)">
+            <option value="recent">Gần đây nhất</option>
+            <option value="name">Tên A-Z</option>
+            <option value="progress">Tiến độ</option>
+          </select>
+        </div>
+
+        <!-- Loading Skeleton -->
+        @if (isLoading()) {
+          <div class="courses-list">
+            @for (i of [1,2,3]; track i) {
+              <div class="course-card-outer">
+                <div class="course-card-wrapper" style="animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite">
+                  <div class="course-thumbnail" style="background:#E5E7EB"></div>
+                  <div class="course-metadata" style="gap:10px">
+                    <div style="height:10px;width:80px;background:#E5E7EB;border-radius:4px"></div>
+                    <div style="height:16px;width:70%;background:#E5E7EB;border-radius:4px"></div>
+                    <div style="height:10px;width:50%;background:#E5E7EB;border-radius:4px"></div>
+                  </div>
+                  <div class="action-buttons" style="min-width:120px">
+                    <div style="height:36px;width:100px;background:#E5E7EB;border-radius:8px"></div>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        }
+
+        <!-- Empty State -->
+        @else if (filteredCourses().length === 0) {
+          <div class="empty-state">
+            <app-icon name="book-open" size="xl" />
+            <h3>{{ activeTab() === 'in-progress' ? 'Chưa có khóa học đang học' : 'Chưa hoàn thành khóa học nào' }}</h3>
+            <p>{{ activeTab() === 'in-progress' ? 'Hãy bắt đầu học một khóa học mới' : 'Tiếp tục học để hoàn thành khóa học đầu tiên' }}</p>
+          </div>
+        }
+
+        <!-- Courses List - Horizontal Cards -->
+        @else {
+          <div class="courses-list">
+            @for (course of visibleCourses(); track course.id) {
+              <div class="course-card-outer">
+              <div class="course-card-wrapper">
+                <!-- Course Thumbnail -->
+                <div class="course-thumbnail">
+                  @if (course.thumbnail && !brokenThumbnailUrls().has(course.thumbnail)) {
+                    <img
+                      [src]="course.thumbnail"
+                      [alt]="course.title"
+                      class="thumbnail-image"
+                      (error)="markThumbnailBroken(course.thumbnail)" />
+                  } @else {
+                    <div class="thumbnail-placeholder">
+                      <app-icon name="academic-cap" size="lg" />
+                    </div>
+                  }
+                </div>
+
+                <!-- Course Metadata — synced with dashboard -->
+                <div class="course-metadata">
+                  <div class="partner-info">{{ getInstructorName(course) }}</div>
+                  <h3 class="course-title">
+                    <a [routerLink]="['/student/courses', course.id]">{{ course.title }}</a>
+                  </h3>
+                  <div class="course-meta">
+                    <span class="delivery-badge" [class.class-mode]="course.deliveryMode === 'INSTRUCTOR_LED'">
+                      {{ course.deliveryMode === 'INSTRUCTOR_LED' ? 'Lớp học' : 'Khóa học' }}
+                    </span>
+                    <span class="separator">·</span>
+                    @if (course.progress > 0) {
+                      <span>{{ course.progress }}% hoàn thành</span>
+                    } @else {
+                      <span>Chưa bắt đầu</span>
+                    }
+                  </div>
+                  @if (course.progress > 0) {
+                    <div class="progress-bar-thin">
+                      <div class="progress-fill" [class.completed]="course.progress >= 100" [style.width.%]="course.progress"></div>
+                    </div>
+                  }
+                </div>
+
+                <!-- Action Buttons — [▼] [Download?] [CTA] rightmost -->
+                <div class="action-buttons">
+                  <button class="dropdown-button" (click)="toggleModules(course.id)" aria-label="Hiển thị bài học">
+                    <app-icon [name]="course.showModules ? 'chevron-up' : 'chevron-down'" size="sm" />
+                  </button>
+                  @if (canDownload(course)) {
+                    <app-course-download-button
+                      [courseId]="course.id"
+                      [courseTitle]="course.title"
+                      [allowOfflineDownload]="true" />
+                  }
+                  <app-button
+                    variant="primary"
+                    (clicked)="resumeCourse(course.id)">
+                    {{ course.progress >= 100 ? 'Xem lại' : course.progress > 0 ? 'Tiếp tục học' : 'Bắt đầu ngay' }}
+                  </app-button>
+                </div>
+              </div>
+
+              <!-- Modules Dropdown -->
+              @if (course.showModules && course.modules && course.modules.length > 0) {
+                <div class="syllabus-section">
+                  @for (module of course.modules; track module.id) {
+                    <div class="module-item">
+                      <div class="module-header">
+                        <svg class="module-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+                        <span class="module-title">{{ module.title }}</span>
+                        <span class="module-count">{{ module.completedCount }}/{{ module.totalCount }}</span>
+                      </div>
+                      <div class="lessons-list">
+                        @for (lesson of module.lessons; track lesson.id) {
+                          <a
+                            [routerLink]="['/student/learn/course', course.id, 'lesson', lesson.id]"
+                            class="lesson-item"
+                            [class.completed]="lesson.completed"
+                            [class.current]="lesson.id === course.currentLessonId">
+                            <span class="lesson-status-icon">
+                              @if (lesson.completed) {
+                                <svg width="16" height="16" viewBox="0 0 20 20" fill="#10B981"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                              } @else if (lesson.id === course.currentLessonId) {
+                                <svg width="16" height="16" viewBox="0 0 20 20" fill="#0056D2"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/></svg>
+                              } @else {
+                                <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="#D1D5DB" stroke-width="1.5"><circle cx="10" cy="10" r="7"/></svg>
+                              }
+                            </span>
+                            <span class="lesson-title">{{ lesson.title }}</span>
+                          </a>
+                          @if (lesson.sections && lesson.sections.length > 0) {
+                            <div class="section-list">
+                              @for (sec of lesson.sections; track sec.id) {
+                                <div class="section-item" [class.completed]="lesson.completed">
+                                  <span class="section-type-icon">
+                                    @if (lesson.completed) {
+                                      <svg width="12" height="12" viewBox="0 0 20 20" fill="#10B981"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                                    } @else if (sec.type === 'VIDEO') {
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                                    } @else if (sec.type === 'QUIZ') {
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                                    } @else {
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                    }
+                                  </span>
+                                  <span class="section-title">{{ sec.title }}</span>
+                                </div>
+                              }
+                            </div>
+                          }
+                        }
+                      </div>
+                    </div>
+                  }
+                </div>
+              }
+              </div>
+            }
+          </div>
+
+        }
+      </div>
+
+      <!-- Sidebar (30%) - Filters -->
+      <aside class="filter-sidebar">
+        <div class="sidebar-section">
+          <h3 class="sidebar-title">Bộ lọc</h3>
+          
+          <!-- Sort By -->
+          <div class="filter-group">
+            <label class="filter-label" for="student-course-sort">Sắp xếp theo</label>
+            <select class="filter-select" id="student-course-sort" name="student-course-sort" [value]="sortBy()" (change)="onSortChange($event)">
+              <option value="recent">Gần đây nhất</option>
+              <option value="name">Tên khóa học</option>
+              <option value="progress">Tiến độ</option>
+            </select>
+          </div>
+
+          <!-- Filter by Progress -->
+          <div class="filter-group">
+            <label class="filter-label">Tiến độ</label>
+            <div class="checkbox-group">
+              <label class="checkbox-label">
+                <input type="checkbox" [checked]="filterNotStarted()" (change)="toggleFilterNotStarted()">
+                <span>Chưa bắt đầu</span>
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" [checked]="filterInProgress()" (change)="toggleFilterInProgress()">
+                <span>Đang học</span>
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" [checked]="filterCompleted()" (change)="toggleFilterCompleted()">
+                <span>Hoàn thành</span>
+              </label>
+            </div>
+          </div>
+
+        </div>
+      </aside>
+
+      <!-- Pagination — spans the full library grid to match the shared wide pattern -->
+      @if (!isLoading() && filteredCourses().length > PAGE_SIZE) {
+        <app-pagination
+          class="library-pagination"
+          [currentPage]="safeCurrentPage()"
+          [totalPages]="totalPages()"
+          [totalItems]="filteredCourses().length"
+          [itemsPerPage]="PAGE_SIZE"
+          (pageChange)="goToPage($event)" />
+      }
+    </div>
+  `,
+  styles: [`
+    @use '../../../styles/variables' as *;
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .my-courses-container {
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      gap: 16px;
+      margin: 0;
+      padding: 0 16px;
+      background: #FAFAFA;
+      min-height: 100vh;
+      max-width: 1400px;
+      margin-left: auto;
+      margin-right: auto;
+
+      @include mobile {
+        grid-template-columns: 1fr;
+        padding: 0 12px;
+        gap: 12px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .course-card-wrapper {
+        flex-direction: column;
+        gap: 10px;
+        padding: 12px;
+      }
+
+      .course-thumbnail {
+        width: 100%;
+        height: 140px;
+      }
+
+      .action-buttons {
+        align-self: stretch;
+        min-width: unset;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+
+        app-button { order: 1; flex: 1; min-width: 0; }
+        .dropdown-button { order: 2; }
+        app-course-download-button { order: 3; flex-basis: 100%; display: flex; justify-content: center; }
+      }
+    }
+
+    /* Tablet landscape: action buttons wrap to second row to avoid squeezing metadata to 0px */
+    @media (min-width: 641px) and (max-width: 1100px) {
+      .course-card-wrapper {
+        flex-wrap: wrap;
+        align-items: flex-start;
+      }
+
+      .course-thumbnail {
+        width: 120px;
+        height: 70px;
+      }
+
+      .action-buttons {
+        flex-basis: 100%;
+        min-width: unset;
+        justify-content: flex-end;
+        border-top: 1px solid #F3F4F6;
+        padding-top: 8px;
+      }
+    }
+
+    .main-content {
+      min-width: 0;
+    }
+
+    /* Mobile sort toolbar — visible only on mobile (sidebar hidden) */
+    .mobile-toolbar {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px 12px 16px;
+    }
+
+    .mobile-count {
+      font-size: 13px;
+      color: #6B7280;
+    }
+
+    .mobile-sort {
+      padding: 6px 10px;
+      border: 1px solid #D1D5DB;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #374151;
+      background: white;
+    }
+
+    @media (max-width: 768px) {
+      .mobile-toolbar {
+        display: flex;
+      }
+    }
+
+    /* Coursera-Style Header */
+    .page-header {
+      margin-bottom: 20px;
+      padding: 24px 16px 0 16px;
+    }
+
+    .page-title {
+      font-size: $text-2xl;
+      font-weight: $font-bold;
+      color: $text-primary;
+      margin: 0 0 $spacing-1 0;
+      line-height: 1.3;
+    }
+
+    .page-subtitle {
+      font-size: $text-sm;
+      color: $text-secondary;
+      margin: 0;
+    }
+
+    /* Search Bar — synced with Khám Phá (student-course-browser) */
+    .search-bar {
+      padding: 0 16px 16px;
+    }
+
+    .search-wrapper {
+      position: relative;
+      max-width: 560px;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #9CA3AF;
+      pointer-events: none;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 12px 16px 12px 44px;
+      border: 1px solid #D1D5DB;
+      border-radius: 24px;
+      font-size: 14px;
+      color: #1F1F1F;
+      background: white;
+      transition: box-shadow 0.2s, border-color 0.2s;
+
+      &::placeholder {
+        color: #9CA3AF;
+      }
+
+      &:focus {
+        outline: none;
+        border-color: #0056D2;
+        box-shadow: 0 0 0 3px rgba(0, 86, 210, 0.08);
+      }
+    }
+
+    .search-clear {
+      position: absolute;
+      right: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      padding: 4px;
+      background: none;
+      border: none;
+      color: #9CA3AF;
+      cursor: pointer;
+      border-radius: 6px;
+      display: flex;
+      transition:
+        background-color 0.15s ease,
+        color 0.15s ease;
+
+      &:hover {
+        color: #374151;
+        background: #F3F4F6;
+      }
+
+      &:focus-visible {
+        outline: 2px solid #0056D2;
+        outline-offset: 2px;
+      }
+    }
+
+    /* Tabs - Sticky */
+    .tabs-section {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: #FAFAFA;
+      padding: 0 16px 16px 16px;
+      margin: 0 0 16px 0;
+      border-bottom: 1px solid #E5E7EB;
+    }
+
+    .tabs-container {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .tab-chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 8px 16px;
+      border: 1px solid #D1D5DB;
+      border-radius: 20px;
+      background: #FFFFFF;
+      color: #374151;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition:
+        background-color 0.2s ease,
+        border-color 0.2s ease,
+        color 0.2s ease;
+
+      &:hover {
+        background: #F9FAFB;
+        border-color: #9CA3AF;
+      }
+
+      &:focus-visible {
+        outline: 2px solid #0056D2;
+        outline-offset: 2px;
+      }
+
+      &.active {
+        background: $blue-primary;
+        color: #FFFFFF;
+        border-color: $blue-primary;
+
+        &:hover {
+          background: #004BB8;
+          border-color: #004BB8;
+        }
+      }
+
+      .tab-label {
+        line-height: 1;
+      }
+    }
+
+    /* Empty State */
+    .empty-state {
+      text-align: center;
+      padding: $spacing-16 $spacing-6;
+      color: $text-secondary;
+
+      app-icon {
+        color: $text-muted;
+        margin-bottom: $spacing-4;
+      }
+
+      h3 {
+        font-size: $text-xl;
+        font-weight: $font-semibold;
+        color: $text-primary;
+        margin: 0 0 $spacing-2 0;
+      }
+
+      p {
+        margin: 0;
+      }
+    }
+
+    /* Courses List - Single Column Layout */
+    .courses-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .course-card-outer {
+      background: white;
+      border: 1px solid #E5E7EB;
+      border-radius: 8px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+      transition: box-shadow 0.2s ease;
+      overflow: hidden;
+
+      &:hover {
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      }
+    }
+
+    .course-card-wrapper {
+      display: flex;
+      gap: 16px;
+      padding: 8px;
+      align-items: center;
+    }
+
+    /* Left Section - Course Thumbnail */
+    .course-thumbnail {
+      width: 140px;
+      height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      flex-shrink: 0;
+      overflow: hidden;
+      background: #F3F4F6;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .thumbnail-image {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .thumbnail-placeholder {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: $blue-primary;
+      background: #E3F2FD;
+    }
+
+    /* Metadata Section */
+    .course-metadata {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .partner-info {
+      margin: 0;
+    }
+
+    .partner-name {
+      font-size: 11px;
+      color: #6B7280;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    .course-title {
+      margin: 0;
+
+      a {
+        font-size: 15px;
+        font-weight: 600;
+        color: #1F1F1F;
+        text-decoration: none;
+        line-height: 1.4;
+        display: block;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+
+        &:hover {
+          color: $blue-primary;
+          text-decoration: underline;
+        }
+      }
+    }
+
+    .course-meta {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 4px;
+      font-size: 12px;
+      color: #6B7280;
+      margin: 0;
+
+      .separator {
+        color: #D1D5DB;
+      }
+
+      .estimated {
+        color: #9CA3AF;
+      }
+
+      .progress-label-completed {
+        color: #10B981;
+        font-weight: 600;
+      }
+    }
+
+    .delivery-badge {
+      font-weight: 500;
+      color: $blue-primary;
+
+      &.class-mode {
+        color: #7C3AED;
+      }
+    }
+
+    /* Progress Bar - Compact Style */
+    .progress-bar-thin {
+      width: 100%;
+      height: 6px;
+      background: #E5E7EB;
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 2px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: $blue-primary;
+      border-radius: 3px;
+      transition: width 0.3s ease;
+
+      &.completed {
+        background: #10B981;
+      }
+    }
+
+    /* Action Buttons — [▼] [Download?] [CTA] rightmost, consistent with dashboard */
+    .action-buttons {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+      align-self: center;
+      min-width: 200px;
+      justify-content: flex-end;
+
+      app-button {
+        white-space: nowrap;
+      }
+    }
+
+    .dropdown-button {
+      padding: 4px;
+      background: transparent;
+      border: 1px solid #E5E7EB;
+      border-radius: 4px;
+      cursor: pointer;
+      color: #6B7280;
+      transition:
+        background-color 0.2s ease,
+        border-color 0.2s ease,
+        color 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+
+      &:hover {
+        background: #F9FAFB;
+        border-color: #D1D5DB;
+        color: #374151;
+      }
+
+      &:focus-visible {
+        outline: 2px solid #0056D2;
+        outline-offset: 2px;
+      }
+
+      app-icon {
+        width: 16px;
+        height: 16px;
+      }
+    }
+
+    /* Syllabus / Accordion (matches dashboard) */
+    .syllabus-section {
+      border-top: 1px solid #E5E7EB;
+      background: #FAFAFA;
+      max-height: 360px;
+      overflow-y: auto;
+
+      &::-webkit-scrollbar { width: 4px; }
+      &::-webkit-scrollbar-track { background: transparent; }
+      &::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 2px; }
+    }
+
+    .module-item {
+      &:not(:first-child) {
+        .module-header {
+          border-top: 1px solid #F3F4F6;
+          margin-top: 2px;
+        }
+      }
+    }
+
+    .module-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 10px 16px;
+      background: white;
+      border-bottom: 1px solid #F3F4F6;
+    }
+
+    .module-icon {
+      color: #9CA3AF;
+      flex-shrink: 0;
+      margin-right: 4px;
+    }
+
+    .module-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #374151;
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .module-count {
+      font-size: 10px;
+      font-weight: 500;
+      color: #636363;
+      white-space: nowrap;
+      flex-shrink: 0;
+      background: #F3F4F6;
+      padding: 1px 6px;
+      border-radius: 3px;
+    }
+
+    .lessons-list {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .lesson-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px 10px 32px;
+      text-decoration: none;
+      transition: background 0.15s ease;
+      border-bottom: 1px solid #F3F4F6;
+      cursor: pointer;
+
+      &:last-child { border-bottom: none; }
+      &:hover { background: white; }
+
+      &.completed {
+        .lesson-title { color: #9CA3AF; }
+      }
+
+      &.current {
+        .lesson-title {
+          color: $blue-primary;
+          font-weight: 500;
+        }
+      }
+    }
+
+    .lesson-status-icon {
+      flex-shrink: 0;
+      width: 16px;
+      height: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      svg { display: block; }
+    }
+
+    .lesson-title {
+      font-size: 13px;
+      color: #374151;
+      flex: 1;
+      line-height: 1.4;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* Section items (3rd level) */
+    .section-list {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding-left: 44px;
+      margin-top: 2px;
+    }
+
+    .section-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      font-size: 12px;
+      color: #6B7280;
+
+      &.completed {
+        .section-title { color: #9CA3AF; }
+        .section-type-icon { color: #10B981; }
+      }
+    }
+
+    .section-type-icon {
+      flex-shrink: 0;
+      width: 12px;
+      height: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #9CA3AF;
+
+      svg { display: block; }
+    }
+
+    .section-title {
+      line-height: 1.3;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* Filter Sidebar - Sticky */
+    .filter-sidebar {
+      position: sticky;
+      top: 24px;
+      height: fit-content;
+      max-height: calc(100vh - 48px);
+      overflow-y: auto;
+      padding: 24px 16px 16px 16px;
+
+      @include mobile {
+        display: none;
+      }
+    }
+
+    .sidebar-section {
+      background: white;
+      border: 1px solid #E5E7EB;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+      transition: box-shadow 0.2s ease;
+
+      &:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+      }
+    }
+
+    .sidebar-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #1F1F1F;
+      margin: 0 0 16px 0;
+    }
+
+    .filter-group {
+      margin-bottom: 20px;
+
+      &:last-child {
+        margin-bottom: 0;
+      }
+    }
+
+    .filter-label {
+      display: block;
+      font-size: 14px;
+      font-weight: 500;
+      color: #374151;
+      margin-bottom: 8px;
+    }
+
+    .filter-select {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #D1D5DB;
+      border-radius: 8px;
+      font-size: 14px;
+      color: #1F1F1F;
+      background: white;
+      cursor: pointer;
+      transition: border-color 0.2s ease;
+
+      &:hover {
+        border-color: #9CA3AF;
+      }
+
+      &:focus {
+        outline: none;
+        border-color: $blue-primary;
+        box-shadow: 0 0 0 3px rgba(0, 86, 210, 0.1);
+      }
+    }
+
+    .checkbox-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      color: #374151;
+      cursor: pointer;
+
+      input[type="checkbox"] {
+        width: 16px;
+        height: 16px;
+        cursor: pointer;
+      }
+    }
+
+
+    /* ===== PAGINATION — shared <app-pagination>, synced with browse page ===== */
+    .library-pagination {
+      display: block;
+      grid-column: 1 / -1;
+      justify-self: center;
+      width: 100%;
+      max-width: 1024px;
+      margin: 32px auto;
+      background: white;
+      border: 1px solid #E5E7EB;
+      border-radius: 8px;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+      overflow: hidden;
+
+      @include mobile {
+        margin: 24px auto 28px;
+      }
+    }
+
+    /* Fade-in for newly loaded courses */
+    .course-card-outer {
+      animation: cardFadeIn 0.25s ease-out;
+    }
+
+    @keyframes cardFadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  `]
+})
+export class StudentMyCoursesComponent implements OnInit {
+  protected authService = inject(AuthService);
+  private enrollmentService = inject(StudentEnrollmentService);
+  private courseApi = inject(CourseApi);
+  private courseDownload = inject(CourseDownloadService);
+  private router = inject(Router);
+  private toast = inject(ToastService);
+
+
+  // State
+  enrolledCourses = signal<EnhancedEnrolledCourse[]>([]);
+  activeTab = signal<string>('in-progress');
+  isLoading = this.enrollmentService.isLoading;
+  readonly PAGE_SIZE = 12;
+  currentPage = signal(1);
+
+  // Search + Filter state
+  searchQuery = signal('');
+  sortBy = signal<string>('recent');
+  filterNotStarted = signal<boolean>(false);
+  filterInProgress = signal<boolean>(false);
+  filterCompleted = signal<boolean>(false);
+  brokenThumbnailUrls = signal<Set<string>>(new Set());
+  error = signal<string | null>(null);
+
+  // Computed
+  readonly filteredCourses = computed(() => {
+    const courses = this.enrolledCourses();
+    const tab = this.activeTab();
+    const sort = this.sortBy();
+    const fNotStarted = this.filterNotStarted();
+    const fInProgress = this.filterInProgress();
+    const fCompleted = this.filterCompleted();
+    const hasProgressFilter = fNotStarted || fInProgress || fCompleted;
+
+    // Tab filter
+    let result = tab === 'in-progress'
+      ? courses.filter(c => c['status'] === 'in-progress' || c['status'] === 'enrolled')
+      : courses.filter(c => c['status'] === 'completed');
+
+    // Search filter (by title, case-insensitive, diacritics-tolerant)
+    const query = this.searchQuery().trim().toLowerCase();
+    if (query) {
+      result = result.filter(c =>
+        c.title.toLowerCase().includes(query) ||
+        (c.instructor && String(c.instructor).toLowerCase().includes(query))
+      );
+    }
+
+    // Progress filters (checkbox - OR logic)
+    if (hasProgressFilter) {
+      result = result.filter(c => {
+        if (fNotStarted && c['progress'] === 0) return true;
+        if (fInProgress && c['progress'] > 0 && c['progress'] < 100) return true;
+        if (fCompleted && c['progress'] >= 100) return true;
+        return false;
+      });
+    }
+
+    // Sort
+    if (sort === 'name') {
+      result = [...result].sort((a, b) => a['title'].localeCompare(b['title']));
+    } else if (sort === 'progress') {
+      result = [...result].sort((a, b) => b['progress'] - a['progress']);
+    } else {
+      // 'recent' = sort by lastAccessed DESC (SOTA: Canvas/Coursera pattern)
+      result = [...result].sort((a, b) => {
+        const aTime = String(a.lastAccessed || '');
+        const bTime = String(b.lastAccessed || '');
+        return bTime.localeCompare(aTime);
+      });
+    }
+
+    return result;
+  });
+
+  readonly totalPages = computed(() =>
+    Math.max(1, Math.ceil(this.filteredCourses().length / this.PAGE_SIZE))
+  );
+  readonly safeCurrentPage = computed(() =>
+    Math.min(Math.max(1, this.currentPage()), this.totalPages())
+  );
+  readonly visibleCourses = computed(() => {
+    const start = (this.safeCurrentPage() - 1) * this.PAGE_SIZE;
+    return this.filteredCourses().slice(start, start + this.PAGE_SIZE);
+  });
+
+  readonly inProgressCount = computed(() =>
+    this.enrolledCourses().filter(c => c['status'] === 'in-progress' || c['status'] === 'enrolled').length
+  );
+
+  readonly completedCount = computed(() =>
+    this.enrolledCourses().filter(c => c['status'] === 'completed').length
+  );
+
+
+  ngOnInit(): void {
+    this.loadCourses();
+  }
+
+
+  private readonly SERVER_PAGE_SIZE = 100;
+
+  private async loadCourses(): Promise<void> {
+    try {
+      this.currentPage.set(1);
+      await this.enrollmentService.loadEnrolledCourses(0, this.SERVER_PAGE_SIZE);
+      let enhancedCourses = this.toEnhancedCourses(this.enrollmentService.enrolledCourses());
+
+      const serverTotalPages = Math.max(1, this.enrollmentService.totalPages());
+      for (let page = 1; page < serverTotalPages; page++) {
+        await this.enrollmentService.loadEnrolledCourses(page, this.SERVER_PAGE_SIZE);
+        enhancedCourses = this.mergeCoursePages(
+          enhancedCourses,
+          this.toEnhancedCourses(this.enrollmentService.enrolledCourses())
+        );
+      }
+      this.enrolledCourses.set(enhancedCourses);
+    } catch (err: any) {
+      this.error.set(err?.message || 'Không thể tải danh sách khóa học. Vui lòng thử lại.');
+    }
+  }
+
+  private toEnhancedCourses(courses: EnrolledCourse[]): EnhancedEnrolledCourse[] {
+    return courses.map(course => ({
+      ...course,
+      showModules: false,
+      modules: [],
+    }));
+  }
+
+  private mergeCoursePages(
+    existing: EnhancedEnrolledCourse[],
+    incoming: EnhancedEnrolledCourse[]
+  ): EnhancedEnrolledCourse[] {
+    const seen = new Set(existing.map(course => course.id));
+    const next = [...existing];
+    for (const course of incoming) {
+      if (!seen.has(course.id)) {
+        seen.add(course.id);
+        next.push(course);
+      }
+    }
+    return next;
+  }
+
+  // Load course content (modules/lessons) from API
+  private async loadCourseContent(courseId: string): Promise<void> {
+    try {
+      // Fetch content + progress + completed lesson IDs in parallel
+      const [contentRes, progressRes, completedIds] = await Promise.all([
+        firstValueFrom(this.courseApi.getCourseContent(courseId)),
+        firstValueFrom(this.courseApi.getCourseProgress(courseId)),
+        this.fetchCompletedLessonIds(courseId)
+      ]);
+      
+      const sections = contentRes.data || [];
+      const completedSet = new Set(completedIds);
+      
+      // Get real progress from API
+      const progressData = progressRes?.data;
+      const totalLessons = progressData?.totalLessons || 0;
+      const completedLessons = progressData?.completedLessons || 0;
+      
+      // Transform API response to module format with completion status
+      const modules = sections.map((section: any) => {
+        const lessons = (section.lessons || []).map((lesson: any) => ({
+          id: lesson.id,
+          title: lesson.title,
+          type: this.getLessonType(lesson.lessonType),
+          duration: lesson.durationMinutes ? `${lesson.durationMinutes} phút` : '',
+          completed: completedSet.has(lesson.id),
+          sections: (lesson.sections || []).map((s: any) => ({
+            id: s.id,
+            title: s.title,
+            type: s.type || 'TEXT'
+          }))
+        }));
+        return {
+          id: section.id,
+          title: section.title,
+          lessons,
+          // Calculate module-level completed count from lessons
+          completedCount: lessons.filter((l: any) => l.completed).length,
+          totalCount: lessons.length,
+        };
+      });
+
+      // Find the first incomplete lesson (current lesson) across all modules
+      let currentLessonId: string | null = null;
+      for (const mod of modules) {
+        for (const lesson of mod.lessons) {
+          if (!lesson.completed) {
+            currentLessonId = lesson.id;
+            break;
+          }
+        }
+        if (currentLessonId) break;
+      }
+
+      // Update the specific course with loaded modules
+      this.enrolledCourses.update(courses =>
+        courses.map(c => {
+          if (c['id'] !== courseId) return c;
+          return { 
+            ...c, 
+            modules, 
+            currentLessonId,
+            // Use real progress from API
+            progress: progressData?.progressPercentage || c.progress,
+            completedLessons: completedLessons,
+            totalLessons: totalLessons
+          };
+        })
+      );
+
+      // Force refresh progress from BE via service
+      await this.enrollmentService.refreshCourseProgress(courseId);
+    } catch (err: any) {
+      this.toast.error('Không thể tải nội dung khóa học.');
+    }
+  }
+
+  private async fetchCompletedLessonIds(courseId: string): Promise<string[]> {
+    try {
+      const res = await firstValueFrom(
+        this.courseApi.getCompletedLessonIds(courseId)
+      );
+      // API returns { data: ["id1", "id2", ...] } — flat array
+      const data = res?.data;
+      return Array.isArray(data) ? data : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private getLessonType(lessonType: string): 'video' | 'reading' | 'quiz' {
+    const type = lessonType?.toLowerCase();
+    if (type === 'quiz') return 'quiz';
+    if (type === 'reading') return 'reading';
+    return 'video';
+  }
+
+  getInstructorName(course: EnhancedEnrolledCourse): string {
+    if (!course.instructor) return 'LMS Maritime';
+    if (typeof course.instructor === 'string') return course.instructor || 'LMS Maritime';
+    return course.instructor.name || 'LMS Maritime';
+  }
+
+  onSearchChange(query: string): void {
+    this.searchQuery.set(query);
+    this.resetPagination();
+  }
+
+  onTabChange(tabId: string): void {
+    this.activeTab.set(tabId);
+    this.resetPagination();
+  }
+
+  markThumbnailBroken(thumbnailUrl: string): void {
+    this.brokenThumbnailUrls.update(urls => {
+      if (urls.has(thumbnailUrl)) {
+        return urls;
+      }
+      return new Set(urls).add(thumbnailUrl);
+    });
+  }
+
+  goToPage(page: number): void {
+    const nextPage = Math.min(Math.max(1, page), this.totalPages());
+    this.currentPage.set(nextPage);
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
+
+  toggleModules(courseId: string): void {
+    const course = this.enrolledCourses().find(c => c['id'] === courseId);
+    const isCurrentlyExpanded = course?.showModules || false;
+
+    // Toggle the showModules state
+    this.enrolledCourses.update(courses =>
+      courses.map(c =>
+        c['id'] === courseId ? { ...c, showModules: !c.showModules } : c
+      )
+    );
+
+    // Load course content if expanding and modules not yet loaded
+    if (!isCurrentlyExpanded && course && (!course.modules || course.modules.length === 0)) {
+      this.loadCourseContent(courseId);
+    }
+  }
+
+  async resumeCourse(courseId: string): Promise<void> {
+    try {
+      // Get next lesson from backend
+      const response = await firstValueFrom(this.courseApi.getNextLesson(courseId)) as any;
+      const nextLessonId = response?.data;
+
+      if (nextLessonId) {
+        // Navigate to specific lesson
+        this.router.navigate(['/student/learn/course', courseId, 'lesson', nextLessonId]);
+      } else {
+        await this.navigateToBestLesson(courseId);
+      }
+    } catch (error) {
+      await this.navigateToBestLesson(courseId);
+    }
+  }
+
+  private async navigateToBestLesson(courseId: string): Promise<void> {
+    if (this.courseDownload.isDownloadedSync(courseId)) {
+      const offlineLessonId = await this.courseDownload.getOfflineResumeLessonId(courseId);
+      if (offlineLessonId) {
+        this.router.navigate(['/student/learn/course', courseId, 'lesson', offlineLessonId]);
+        return;
+      }
+    }
+
+    this.router.navigate(['/student/learn/course', courseId]);
+  }
+
+  onSortChange(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value;
+    this.sortBy.set(value);
+    this.resetPagination();
+  }
+
+  toggleFilterNotStarted(): void {
+    this.filterNotStarted.update(v => !v);
+    this.resetPagination();
+  }
+
+  toggleFilterInProgress(): void {
+    this.filterInProgress.update(v => !v);
+    this.resetPagination();
+  }
+
+  toggleFilterCompleted(): void {
+    this.filterCompleted.update(v => !v);
+    this.resetPagination();
+  }
+
+  canDownload(course: EnhancedEnrolledCourse): boolean {
+    const allowDownload = (course as any).allowOfflineDownload !== false;
+    return allowDownload;
+  }
+
+  private resetPagination(): void {
+    this.currentPage.set(1);
+  }
+}

@@ -1,0 +1,61 @@
+import { Component, input, ChangeDetectionStrategy } from '@angular/core';
+
+
+@Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  selector: 'app-card',
+  imports: [],
+  template: `
+    <div [class]="cardClasses()">
+      <ng-content></ng-content>
+    </div>
+  `,
+  styles: [`
+    @use '../../../../../styles/variables' as *;
+
+    .card {
+      background: $bg-surface;
+      border-radius: $card-radius;
+      box-shadow: $card-shadow;
+      overflow: hidden;
+      transition: box-shadow $transition-normal;
+
+      &.card-hover:hover {
+        box-shadow: $shadow-card-hover;
+      }
+
+      &.card-bordered {
+        border: 1px solid $border-default;
+        box-shadow: none;
+      }
+    }
+
+    .card-padding {
+      padding: $card-padding;
+    }
+
+    .card-clickable {
+      cursor: pointer;
+      
+      &:active {
+        transform: translateY(1px);
+      }
+    }
+  `]
+})
+export class CardComponent {
+  hover = input<boolean>(true);
+  bordered = input<boolean>(false);
+  padding = input<boolean>(true);
+  clickable = input<boolean>(false);
+
+  cardClasses() {
+    return [
+      'card',
+      this.hover() ? 'card-hover' : '',
+      this.bordered() ? 'card-bordered' : '',
+      this.padding() ? 'card-padding' : '',
+      this.clickable() ? 'card-clickable' : ''
+    ].filter(Boolean).join(' ');
+  }
+}

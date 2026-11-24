@@ -1,0 +1,401 @@
+package com.example.lms.assessment.application.usecase;
+
+import com.example.lms.assessment.domain.model.QuestionBank;
+import com.example.lms.assessment.domain.model.QuestionBankCategory;
+import com.example.lms.assessment.domain.model.Question;
+import com.example.lms.assessment.domain.repository.QuestionBankCategoryRepository;
+import com.example.lms.assessment.domain.repository.QuestionBankRepository;
+import com.example.lms.assessment.domain.repository.QuestionRepository;
+import com.example.lms.shared.exception.EntityNotFoundException;
+import com.example.lms.shared.exception.BusinessRuleException;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.*;
+import java.util.stream.Collectors;
+
+/**
+ * Use case: QuestionBank management (CRUD bank, CRUD category, move questions).
+ */
+@Service
+@Slf4j
+public class QuestionBankManagementUseCase {
+
+    private final QuestionBankRepository bankRepository;
+    private final QuestionBankCategoryRepository categoryRepository;
+    private final QuestionRepository questionRepository;
+
+    public QuestionBankManagementUseCase(QuestionBankRepository bankRepository,
+                                         QuestionBankCategoryRepository categoryRepository,
+                                         QuestionRepository questionRepository) {
+        this.bankRepository = bankRepository;
+        this.categoryRepository = categoryRepository;
+        this.questionRepository = questionRepository;
+    }
+
+    // ============ Bank CRUD ============
+
+    @Transactional
+    public QuestionBank createBank(CreateBankCommand command) {
+        log.info("Creating question bank: {} for user: {}", command.name(), command.ownerId());
+
+        QuestionBank bank = QuestionBank.create(
+                command.name(), command.description(), command.subject(),
+                command.ownerId(), command.bankType(), command.visibility()
+        );
+
+        return bankRepository.save(bank);
+    }
+
+    @Transactional
+    public QuestionBank updateBank(UUID bankId, UpdateBankCommand command, UUID userId, boolean isAdmin) {
+        QuestionBank bank = bankRepository.findById(bankId)
+                .orElseThrow(() -> new EntityNotFoundException("QuestionBank", bankId));
+
+        if (!isAdmin && !bank.isOwnedBy(userId)) {
+            throw new BusinessRuleException("Bạn không sở hữu ngân hàng câu hỏi này");
+        }
+
+        if (command.name() != null) bank.rename(command.name());
+        if (command.description() != null) bank.updateDescription(command.description());
+        if (command.subject() != null) bank.updateSubject(command.subject());
+        if (command.visibility() != null) bank.changeVisibility(command.visibility());
+
+        return bankRepository.save(bank);
+    }
+
+    @Transactional
+    public void archiveBank(UUID bankId, UUID userId, boolean isAdmin) {
+        QuestionBank bank = bankRepository.findById(bankId)
+                .orElseThrow(() -> new EntityNotFoundException("QuestionBank", bankId));
+
+        if (!isAdmin && !bank.isOwnedBy(userId)) {
+            throw new BusinessRuleException("Bạn không sở hữu ngân hàng câu hỏi này");
+        }
+
+        bank.archive();
+        bankRepository.save(bank);
+        log.info("Archived question bank: {}", bankId);
+    }
+
+    @Transactional(readOnly = true)
+    public QuestionBank getBankById(UUID bankId) {
+        return bankRepository.findById(bankId)
+                .orElseThrow(() -> new EntityNotFoundException("QuestionBank", bankId));
+    }
+
+    @Transactional(readOnly = true)
+    public List<QuestionBank> getMyBanks(UUID ownerId) {
+        return bankRepository.findByOwnerId(ownerId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<QuestionBank> searchBanks(String query) {
+        return bankRepository.searchByName(query);
+    }
+
+    @Transactional(readOnly = true)
+    public List<QuestionBank> getBanksByVisibility(QuestionBank.Visibility visibility) {
+        return bankRepository.findByVisibility(visibility);
+    }
+
+    // ============ Category CRUD ============
+
+    @Transactional
+    public QuestionBankCategory addCategory(UUID bankId, AddCategoryCommand command, UUID userId) {
+        QuestionBank bank = bankRepository.findById(bankId)
+                .orElseThrow(() -> new EntityNotFoundException("QuestionBank", bankId));
+
+        if (!bank.isOwnedBy(userId)) {
+            throw new BusinessRuleException("Bạn không sở hữu ngân hàng câu hỏi này");
+        }
+
+        QuestionBankCategory category;
+        if (command.parentId() != null) {
+            // Verify parent exists and belongs to the same bank
+            QuestionBankCategory parent = categoryRepository.findById(command.parentId())
+                    .orElseThrow(() -> new EntityNotFoundException("QuestionBankCategory", command.parentId()));
+            if (!parent.getBankId().equals(bankId)) {
+                throw new BusinessRuleException("Danh mục cha không thuộc ngân hàng này");
+            }
+            category = QuestionBankCategory.createChild(bankId, command.parentId(), command.name(), command.description(), command.sortOrder());
+        } else {
+            category = QuestionBankCategory.createRoot(bankId, command.name(), command.description(), command.sortOrder());
+        }
+
+        return categoryRepository.save(category);
+    }
+
+    @Transactional
+    public QuestionBankCategory updateCategory(UUID categoryId, UpdateCategoryCommand command, UUID userId) {
+        QuestionBankCategory category = categoryRepository.findById(categoryId)
+                .orElseThrow(() -> new EntityNotFoundException("QuestionBankCategory", categoryId));
+
+        // Verify ownership via bank
+        QuestionBank bank = bankRepository.findById(category.getBankId())
+                .orElseThrow(() -> new EntityNotFoundException("QuestionBank", category.getBankId()));
+        if (!bank.isOwnedBy(userId)) {
+            throw new BusinessRuleException("Bạn không sở hữu ngân hàng câu hỏi này");
+        }
+
+        if (command.name() != null) category.rename(command.name());
+        if (command.description() != null) category.updateDescription(command.description());
+        if (command.sortOrder() != null) category.reorder(command.sortOrder());
+
+        return categoryRepository.save(category);
+    }
+
+    @Transactional
+    public void deleteCategory(UUID categoryId, UUID userId) {
+        QuestionBankCategory category = categoryRepository.findById(categoryId)
+                .orElseThrow(() -> new EntityNotFoundException("QuestionBankCategory", categoryId));
+
+        QuestionBank bank = bankRepository.findById(category.getBankId())
+                .orElseThrow(() -> new EntityNotFoundException("QuestionBank", category.getBankId()));
+        if (!bank.isOwnedBy(userId)) {
+            throw new BusinessRuleException("Bạn không sở hữu ngân hàng câu hỏi này");
+        }
+
+        // Questions in this category will have category_id set to NULL (FK ON DELETE SET NULL)
+        categoryRepository.deleteById(categoryId);
+        log.info("Deleted category: {}", categoryId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<QuestionBankCategory> getCategoryTree(UUID bankId) {
+        List<QuestionBankCategory> allCategories = categoryRepository.findByBankId(bankId);
+
+        // Build tree structure
+        Map<UUID, QuestionBankCategory> categoryMap = new LinkedHashMap<>();
+        for (QuestionBankCategory cat : allCategories) {
+            categoryMap.put(cat.getId(), cat);
+        }
+
+        List<QuestionBankCategory> roots = new ArrayList<>();
+        for (QuestionBankCategory cat : allCategories) {
+            if (cat.getParentId() == null) {
+                roots.add(cat);
+            } else {
+                QuestionBankCategory parent = categoryMap.get(cat.getParentId());
+                if (parent != null) {
+                    parent.addChild(cat);
+                }
+            }
+        }
+
+        return roots;
+    }
+
+    // ============ Move Questions ============
+
+    @Transactional
+    public void moveQuestionsToBank(MoveQuestionsCommand command, UUID userId) {
+        QuestionBank targetBank = bankRepository.findById(command.targetBankId())
+                .orElseThrow(() -> new EntityNotFoundException("QuestionBank", command.targetBankId()));
+
+        if (!targetBank.isOwnedBy(userId)) {
+            throw new BusinessRuleException("Bạn không sở hữu ngân hàng câu hỏi đích");
+        }
+
+        List<Question> questions = questionRepository.findAllByIds(command.questionIds());
+        if (questions.isEmpty()) {
+            throw new BusinessRuleException("Không tìm thấy câu hỏi với các ID cung cấp");
+        }
+
+        // Collect source bank IDs before moving (questions may come from different banks)
+        Set<UUID> sourceBankIds = questions.stream()
+                .map(Question::getPackageId)
+                .filter(id -> id != null && !id.equals(command.targetBankId()))
+                .collect(Collectors.toSet());
+
+        // Collect old category IDs before moving (to refresh their counts after)
+        Set<UUID> affectedCategoryIds = questions.stream()
+                .map(Question::getCategoryId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (command.targetCategoryId() != null) {
+            affectedCategoryIds.add(command.targetCategoryId());
+        }
+
+        for (Question question : questions) {
+            question.moveToBank(command.targetBankId(), command.targetCategoryId());
+        }
+        questionRepository.saveAll(questions);
+
+        // Update source bank counts
+        for (UUID sourceBankId : sourceBankIds) {
+            bankRepository.findById(sourceBankId).ifPresent(sourceBank -> {
+                sourceBank.setQuestionCount((int) questionRepository.countByBankId(sourceBankId));
+                bankRepository.save(sourceBank);
+            });
+        }
+
+        // Update target bank count
+        targetBank.setQuestionCount((int) questionRepository.countByBankId(command.targetBankId()));
+        bankRepository.save(targetBank);
+
+        // Update questionCount on all affected categories
+        for (UUID catId : affectedCategoryIds) {
+            categoryRepository.findById(catId).ifPresent(cat -> {
+                cat.setQuestionCount((int) questionRepository.countByCategoryId(catId));
+                categoryRepository.save(cat);
+            });
+        }
+
+        log.info("Moved {} questions to bank: {}", questions.size(), command.targetBankId());
+    }
+
+    @Transactional
+    public List<Question> copyQuestionsToBank(CopyQuestionsCommand command, UUID userId) {
+        QuestionBank targetBank = bankRepository.findById(command.targetBankId())
+                .orElseThrow(() -> new EntityNotFoundException("QuestionBank", command.targetBankId()));
+        if (!targetBank.isOwnedBy(userId)) {
+            throw new BusinessRuleException("Bạn không sở hữu ngân hàng câu hỏi đích");
+        }
+
+        List<Question> sourceQuestions = questionRepository.findAllByIds(command.questionIds());
+        if (sourceQuestions.isEmpty()) {
+            throw new BusinessRuleException("Không tìm thấy câu hỏi với các ID cung cấp");
+        }
+
+        // Verify each source question is accessible (own bank or PUBLIC bank)
+        for (Question q : sourceQuestions) {
+            if (q.getPackageId() == null) continue;
+            QuestionBank sourceBank = bankRepository.findById(q.getPackageId())
+                    .orElseThrow(() -> new EntityNotFoundException("QuestionBank", q.getPackageId()));
+            if (!sourceBank.isOwnedBy(userId) && sourceBank.getVisibility() != QuestionBank.Visibility.PUBLIC) {
+                throw new BusinessRuleException("Câu hỏi không thuộc ngân hàng có thể truy cập");
+            }
+        }
+
+        // Deep-copy each question: new UUID, same content, options with new UUIDs
+        List<Question> copies = new ArrayList<>();
+        for (Question source : sourceQuestions) {
+            List<Question.QuestionOption> copiedOptions = null;
+            if (source.getOptions() != null) {
+                copiedOptions = source.getOptions().stream()
+                        .map(o -> Question.QuestionOption.builder()
+                                .id(UUID.randomUUID())
+                                .key(o.getKey())
+                                .contentBlocks(o.getContentBlocks())
+                                .orderIndex(o.getOrderIndex())
+                                .build())
+                        .collect(Collectors.toList());
+            }
+            Question copy = Question.builder()
+                    .id(UUID.randomUUID())
+                    .contentBlocks(source.getContentBlocks())
+                    .difficulty(source.getDifficulty())
+                    .tags(source.getTags())
+                    .status(source.getStatus())
+                    .questionType(source.getQuestionType())
+                    .correctOption(source.getCorrectOption())
+                    .answerKey(source.getAnswerKey())
+                    .createdBy(userId)
+                    .courseId(null)
+                    .packageId(command.targetBankId())
+                    .categoryId(command.targetCategoryId())
+                    .usageCount(0)
+                    .correctRate(BigDecimal.ZERO)
+                    .options(copiedOptions)
+                    .createdAt(Instant.now())
+                    .updatedAt(Instant.now())
+                    .build();
+            copies.add(copy);
+        }
+        questionRepository.saveAll(copies);
+
+        // Update target bank question count
+        targetBank.setQuestionCount((int) questionRepository.countByBankId(command.targetBankId()));
+        bankRepository.save(targetBank);
+
+        // Update target category count if specified
+        if (command.targetCategoryId() != null) {
+            categoryRepository.findById(command.targetCategoryId()).ifPresent(cat -> {
+                cat.setQuestionCount((int) questionRepository.countByCategoryId(command.targetCategoryId()));
+                categoryRepository.save(cat);
+            });
+        }
+
+        log.info("Copied {} questions to bank: {} by user: {}", copies.size(), command.targetBankId(), userId);
+        return copies;
+    }
+
+    @Transactional
+    public void moveQuestionsToCategory(UUID categoryId, List<UUID> questionIds, UUID userId) {
+        QuestionBankCategory category = categoryRepository.findById(categoryId)
+                .orElseThrow(() -> new EntityNotFoundException("QuestionBankCategory", categoryId));
+
+        QuestionBank bank = bankRepository.findById(category.getBankId())
+                .orElseThrow(() -> new EntityNotFoundException("QuestionBank", category.getBankId()));
+        if (!bank.isOwnedBy(userId)) {
+            throw new BusinessRuleException("Bạn không sở hữu ngân hàng câu hỏi này");
+        }
+
+        List<Question> questions = questionRepository.findAllByIds(questionIds);
+        for (Question question : questions) {
+            question.moveToCategory(categoryId);
+        }
+        questionRepository.saveAll(questions);
+
+        // Update category question count
+        category.setQuestionCount((int) questionRepository.countByCategoryId(categoryId));
+        categoryRepository.save(category);
+
+        log.info("Moved {} questions to category: {}", questions.size(), categoryId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Question> getBankQuestions(UUID bankId, UUID categoryId) {
+        if (categoryId != null) {
+            return questionRepository.findByBankIdAndCategoryId(bankId, categoryId);
+        }
+        return questionRepository.findByBankId(bankId);
+    }
+
+    // ============ Commands ============
+
+    public record CreateBankCommand(
+            String name,
+            String description,
+            String subject,
+            UUID ownerId,
+            QuestionBank.BankType bankType,
+            QuestionBank.Visibility visibility
+    ) {}
+
+    public record UpdateBankCommand(
+            String name,
+            String description,
+            String subject,
+            QuestionBank.Visibility visibility
+    ) {}
+
+    public record AddCategoryCommand(
+            String name,
+            String description,
+            UUID parentId,
+            int sortOrder
+    ) {}
+
+    public record UpdateCategoryCommand(
+            String name,
+            String description,
+            Integer sortOrder
+    ) {}
+
+    public record MoveQuestionsCommand(
+            List<UUID> questionIds,
+            UUID targetBankId,
+            UUID targetCategoryId
+    ) {}
+
+    public record CopyQuestionsCommand(
+            List<UUID> questionIds,
+            UUID targetBankId,
+            UUID targetCategoryId
+    ) {}
+}

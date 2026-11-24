@@ -1,0 +1,13 @@
+<div class="assessments-shell">
+  @if (!hideHeader()) {
+    <header class="assessments-header">
+      <nav class="assessments-breadcrumb">
+        <span class="assessments-label">{{ sectionLabel }}</span>
+        <span class="assessments-separator">›</span>
+        <span class="assessments-current">{{ pageTitle() }}</span>
+      </nav>
+    </header>
+  }
+</div>
+
+<router-outlet></router-outlet>

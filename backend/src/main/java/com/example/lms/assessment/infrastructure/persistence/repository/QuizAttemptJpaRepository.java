@@ -1,0 +1,80 @@
+package com.example.lms.assessment.infrastructure.persistence.repository;
+
+import com.example.lms.assessment.infrastructure.persistence.entity.QuizAttemptJpaEntity;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.UUID;
+
+@Repository
+public interface QuizAttemptJpaRepository extends JpaRepository<QuizAttemptJpaEntity, UUID> {
+    List<QuizAttemptJpaEntity> findByQuizIdAndStudentId(UUID quizId, UUID studentId);
+
+    @Query("SELECT qa FROM QuizAttemptJpaEntity qa WHERE qa.quizId = :quizId ORDER BY qa.createdAt DESC")
+    List<QuizAttemptJpaEntity> findByQuizIdOrderByCreatedAtDesc(@Param("quizId") UUID quizId);
+
+    @Query("SELECT qa FROM QuizAttemptJpaEntity qa WHERE qa.quizId IN :quizIds ORDER BY qa.createdAt DESC")
+    List<QuizAttemptJpaEntity> findByQuizIdInOrderByCreatedAtDesc(@Param("quizIds") List<UUID> quizIds);
+
+    @Query("SELECT qa FROM QuizAttemptJpaEntity qa WHERE qa.studentId = :studentId ORDER BY qa.createdAt DESC")
+    List<QuizAttemptJpaEntity> findByStudentIdOrderByCreatedAtDesc(@Param("studentId") UUID studentId);
+
+    // === Paginated queries (Canvas SOTA: page + per_page) ===
+
+    @Query("SELECT qa FROM QuizAttemptJpaEntity qa WHERE qa.quizId = :quizId ORDER BY qa.createdAt DESC")
+    Page<QuizAttemptJpaEntity> findByQuizIdOrderByCreatedAtDesc(@Param("quizId") UUID quizId, Pageable pageable);
+
+    @Query("SELECT qa FROM QuizAttemptJpaEntity qa WHERE qa.studentId = :studentId ORDER BY qa.createdAt DESC")
+    Page<QuizAttemptJpaEntity> findByStudentIdOrderByCreatedAtDesc(@Param("studentId") UUID studentId, Pageable pageable);
+
+    @Query("SELECT qa FROM QuizAttemptJpaEntity qa WHERE qa.quizId IN :quizIds ORDER BY qa.createdAt DESC")
+    Page<QuizAttemptJpaEntity> findByQuizIdInOrderByCreatedAtDesc(@Param("quizIds") List<UUID> quizIds, Pageable pageable);
+
+    // === Analytics queries ===
+
+    @Query("SELECT AVG(qa.score / qa.maxScore * 100) FROM QuizAttemptJpaEntity qa WHERE qa.studentId = :studentId AND qa.status = 'GRADED' AND qa.maxScore > 0")
+    Double getAverageScorePercentByStudentId(@Param("studentId") UUID studentId);
+
+    @Query("SELECT qa FROM QuizAttemptJpaEntity qa WHERE qa.studentId = :studentId AND qa.status = 'GRADED' ORDER BY qa.submittedAt DESC")
+    List<QuizAttemptJpaEntity> findGradedByStudentIdOrderBySubmittedAtDesc(@Param("studentId") UUID studentId);
+
+    long countByStudentIdAndStatus(UUID studentId, QuizAttemptJpaEntity.AttemptStatus status);
+
+    @Query("SELECT COUNT(qa) FROM QuizAttemptJpaEntity qa WHERE qa.studentId = :studentId AND qa.status = 'GRADED' AND qa.maxScore > 0 AND qa.score >= qa.maxScore")
+    long countPerfectScoresByStudentId(@Param("studentId") UUID studentId);
+
+    @Query("SELECT qa FROM QuizAttemptJpaEntity qa WHERE qa.quizId IN :quizIds AND qa.studentId = :studentId")
+    List<QuizAttemptJpaEntity> findByQuizIdInAndStudentId(@Param("quizIds") List<UUID> quizIds, @Param("studentId") UUID studentId);
+
+    // === Teacher quiz list batch stats (avoid N+1) ===
+
+    @Query(value = "SELECT qa.quiz_id, " +
+           "COUNT(DISTINCT qa.student_id) as attempt_count, " +
+           "COUNT(CASE WHEN qa.status = 'GRADED' OR qa.status = 'SUBMITTED' THEN 1 END) as completed_count, " +
+           "AVG(CASE WHEN qa.score IS NOT NULL AND qa.max_score > 0 THEN qa.score / qa.max_score * 100 END) as avg_score, " +
+           "COUNT(CASE WHEN qa.score IS NOT NULL AND qa.max_score > 0 AND qa.score / qa.max_score * 100 >= q.passing_score THEN 1 END) as passed_count, " +
+           "COUNT(*) as total_attempts " +
+           "FROM quiz_attempts qa " +
+           "JOIN quizzes q ON qa.quiz_id = q.id " +
+           "WHERE qa.quiz_id IN :quizIds " +
+           "GROUP BY qa.quiz_id", nativeQuery = true)
+    List<Object[]> batchQuizStats(@Param("quizIds") List<UUID> quizIds);
+
+    @Query("SELECT COUNT(qa) FROM QuizAttemptJpaEntity qa WHERE qa.quizId = :quizId AND qa.status = 'SUBMITTED'")
+    long countSubmittedByQuizId(@Param("quizId") UUID quizId);
+
+    // === Resume + Preflight queries ===
+
+    List<QuizAttemptJpaEntity> findByQuizIdAndStudentIdAndStatus(UUID quizId, UUID studentId, QuizAttemptJpaEntity.AttemptStatus status);
+
+    @Query("SELECT COUNT(qa) FROM QuizAttemptJpaEntity qa WHERE qa.quizId = :quizId AND qa.studentId = :studentId AND (qa.status = 'SUBMITTED' OR qa.status = 'GRADED' OR qa.status = 'TIMEOUT' OR qa.status = 'EXPIRED')")
+    long countCompletedAttempts(@Param("quizId") UUID quizId, @Param("studentId") UUID studentId);
+
+    @Query("SELECT DISTINCT qa.studentId FROM QuizAttemptJpaEntity qa WHERE qa.quizId = :quizId")
+    List<UUID> findDistinctStudentIdsByQuizId(@Param("quizId") UUID quizId);
+}

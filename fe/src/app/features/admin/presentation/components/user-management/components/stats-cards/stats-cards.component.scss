@@ -1,0 +1,59 @@
+@use '../../../../../../../../styles/variables' as *;
+
+/* Migrated to <app-kpi-card> per CC-01 (mega audit 2026-04-25). The card
+   visuals (value / label / sub / variant) live in the shared component;
+   this file only owns the grid layout. */
+
+:host {
+  display: block;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: $spacing-4;
+  margin-bottom: $spacing-8;
+
+  @media (min-width: $breakpoint-sm) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  @include desktop {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.stats-grid > app-kpi-card {
+  background: $bg-surface;
+  border-radius: $radius-lg;
+  border: 1px solid $border-default;
+  transition: box-shadow $transition-normal;
+
+  &:hover {
+    box-shadow: $shadow-lg;
+  }
+}
+
+@media (max-width: 340px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+    gap: $spacing-3;
+    margin-bottom: $spacing-6;
+  }
+}
+
+@media print {
+  .stats-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: $spacing-2;
+  }
+
+  .stats-grid > app-kpi-card {
+    box-shadow: none;
+    border: 1px solid #ddd;
+
+    &:hover {
+      box-shadow: none;
+    }
+  }
+}

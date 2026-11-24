@@ -1,0 +1,380 @@
+<div class="students-container">
+  <div class="main-content">
+    <!-- ===== HEADER ===== -->
+    <div class="page-header">
+      <div class="header-content">
+        <div class="title-section">
+          @if (selectedCourse()) {
+            <button type="button" class="back-link" (click)="backToCourses()">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"/>
+              </svg>
+              Quay lại danh sách khóa học
+            </button>
+          }
+          <h1 class="page-title">
+            {{ selectedCourse() ? selectedCourse()!.title : 'Quản lý học viên' }}
+          </h1>
+          <p class="page-subtitle">
+            @if (selectedCourse()) {
+              @let counts = studentCounts();
+              @if (counts) {
+                <span>{{ counts.total }} ghi danh</span>
+                @if (counts.completed > 0) {
+                  <span class="subtitle-separator">&middot;</span>
+                  <span>{{ counts.completed }} hoàn thành</span>
+                }
+                @if (counts.active > 0) {
+                  <span class="subtitle-separator">&middot;</span>
+                  <span>{{ counts.active }} đang học</span>
+                }
+                @if (counts.suspended > 0) {
+                  <span class="subtitle-separator">&middot;</span>
+                  <span>{{ counts.suspended }} tạm khóa</span>
+                }
+              } @else {
+                {{ total() }} học viên đang ghi danh
+              }
+            } @else {
+              Theo dõi tiến độ học viên theo từng khóa học
+            }
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== COURSE PICKER VIEW ===== -->
+    @if (!selectedCourse()) {
+      <!-- Toolbar: chỉ search (course status tabs đã bỏ — chỉ hiện APPROVED/PUBLISHED) -->
+      <div class="section-header">
+        <p class="section-hint">
+          @if (!loading() && filteredCourses().length > 0) {
+            {{ courseTotal() }} khóa học đang hoạt động
+          }
+        </p>
+        <div class="search-wrapper">
+          <svg class="search-icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.2-5.2M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/>
+          </svg>
+          <input
+            type="search"
+            class="search-input"
+            placeholder="Tìm tên hoặc mã khóa học..."
+            aria-label="Tìm khóa học"
+            [ngModel]="courseKeyword()"
+            (input)="onCourseSearchInput($event)" />
+        </div>
+      </div>
+
+      <!-- Loading: skeleton -->
+      @if (loading()) {
+        <div class="courses-list">
+          @for (i of [1, 2, 3]; track i) {
+            <div class="course-card">
+              <div class="course-card-body">
+                <div class="course-thumbnail skeleton-thumb"></div>
+                <div class="course-metadata">
+                  <div class="skeleton-line w60"></div>
+                  <div class="skeleton-line w40"></div>
+                </div>
+              </div>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- Error -->
+      @if (!loading() && error()) {
+        <div class="empty-state">
+          <div class="empty-state-icon">
+            <svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
+            </svg>
+          </div>
+          <h3 class="empty-state-title">Không thể tải dữ liệu</h3>
+          <p class="empty-state-text">{{ error() }}</p>
+          <button type="button" class="retry-link" (click)="onReload()">Thử lại</button>
+        </div>
+      }
+
+      <!-- Empty: chưa có khóa học APPROVED nào -->
+      @if (!loading() && !error() && filteredCourses().length === 0 && !courseKeyword()) {
+        <div class="empty-state">
+          <div class="empty-state-icon">
+            <svg width="40" height="40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"/>
+            </svg>
+          </div>
+          <h3 class="empty-state-title">Chưa có khóa học đang hoạt động</h3>
+          <p class="empty-state-text">
+            @if (courses().length === 0) {
+              Tạo khóa học đầu tiên để bắt đầu giảng dạy và quản lý học viên
+            } @else {
+              Khóa học cần được duyệt và xuất bản để có học viên ghi danh. Hãy hoàn thiện và gửi duyệt khóa học của bạn.
+            }
+          </p>
+          @if (courses().length === 0) {
+            <a routerLink="/teacher/course-creation" class="retry-link">Tạo khóa học mới &rarr;</a>
+          } @else {
+            <a routerLink="/teacher/courses" class="retry-link">Đi tới Khóa học của tôi &rarr;</a>
+          }
+        </div>
+      }
+
+      <!-- Empty: search không khớp -->
+      @if (!loading() && !error() && filteredCourses().length === 0 && courseKeyword()) {
+        <div class="empty-state">
+          <div class="empty-state-icon">
+            <svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-5.2-5.2M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/>
+            </svg>
+          </div>
+          <h3 class="empty-state-title">Không tìm thấy khóa học phù hợp</h3>
+          <p class="empty-state-text">Thử với từ khóa khác hoặc xóa bộ lọc</p>
+          <button type="button" class="retry-link" (click)="clearCourseSearch()">Xóa tìm kiếm</button>
+        </div>
+      }
+
+      <!-- Course cards -->
+      @if (!loading() && !error() && filteredCourses().length > 0) {
+        <div class="courses-list">
+          @for (course of pagedCourses(); track course.id) {
+            <button
+              type="button"
+              class="course-card"
+              [attr.aria-label]="'Xem học viên khóa: ' + course.title"
+              (click)="viewCourseStudents(course)">
+              <div class="course-card-body">
+                <!-- Thumbnail -->
+                <div class="course-thumbnail">
+                  @if (course.thumbnailUrl) {
+                    <img
+                      [ngSrc]="course.thumbnailUrl"
+                      width="160"
+                      height="90"
+                      [alt]="course.title"
+                      class="thumbnail-image"
+                      (error)="onThumbError($event)" />
+                  } @else {
+                    <div class="thumbnail-placeholder">
+                      <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"/>
+                      </svg>
+                    </div>
+                  }
+                </div>
+
+                <!-- Metadata -->
+                <div class="course-metadata">
+                  <h3 class="course-title">{{ course.title }}</h3>
+                  <div class="course-meta">
+                    @if (course.code) {
+                      <span class="meta-code">{{ course.code }}</span>
+                      <span class="separator">&middot;</span>
+                    }
+                    <span>{{ course.enrolledCount || 0 }} học viên</span>
+                    @if (course.lessonCount) {
+                      <span class="separator">&middot;</span>
+                      <span>{{ course.lessonCount }} bài học</span>
+                    }
+                  </div>
+                </div>
+
+                <!-- Action: chỉ enrolled count + arrow (không cần status badge — đã filter APPROVED) -->
+                <div class="course-actions">
+                  <span class="course-date">{{ formatDate(course.updatedAt || course.createdAt) }}</span>
+                  <span class="card-arrow" aria-hidden="true">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                    </svg>
+                  </span>
+                </div>
+              </div>
+            </button>
+          }
+        </div>
+
+        <!-- Pagination: dùng shared component đồng bộ với admin/users-table và public/courses -->
+        @if (courseTotalPages() > 1) {
+          <app-pagination
+            class="pagination-shared"
+            [currentPage]="coursePageIndex()"
+            [totalPages]="courseTotalPages()"
+            [totalItems]="courseTotal()"
+            [itemsPerPage]="coursePageSize"
+            (pageChange)="goToCoursePage($event)" />
+        }
+      }
+    } @else {
+      <!-- ===== STUDENT LIST VIEW ===== -->
+      <div class="students-panel">
+        <div class="section-header">
+          <div class="flex flex-wrap items-center gap-2" role="tablist" aria-label="Lọc học viên theo trạng thái">
+            @for (tab of studentTabItems; track tab.key) {
+              <button
+                type="button"
+                role="tab"
+                [attr.aria-selected]="status === tab.key"
+                class="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors"
+                [class.bg-[#0056D2]]="status === tab.key"
+                [class.text-white]="status === tab.key"
+                [class.border-[#0056D2]]="status === tab.key"
+                [class.bg-white]="status !== tab.key"
+                [class.text-gray-700]="status !== tab.key"
+                [class.border-gray-200]="status !== tab.key"
+                [class.hover:border-gray-300]="status !== tab.key"
+                (click)="setStudentStatus(tab.key)">
+                @let count = getStudentTabCount(tab.key);
+                {{ tab.label }}@if (count !== null) { <span class="tab-count">({{ count }})</span> }
+              </button>
+            }
+          </div>
+          <div class="search-wrapper">
+            <svg class="search-icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.2-5.2M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/>
+            </svg>
+            <input
+              type="search"
+              class="search-input"
+              placeholder="Tìm tên hoặc email học viên..."
+              aria-label="Tìm học viên"
+              [(ngModel)]="keyword"
+              (keyup.enter)="applyFilters()"
+              (input)="onStudentSearchInput($event)" />
+          </div>
+        </div>
+
+        <!-- Loading: skeleton table rows -->
+        @if (loading()) {
+          <div class="table-card">
+            <table class="students-table">
+              <thead>
+                <tr>
+                  <th>Học viên</th>
+                  <th>Email</th>
+                  <th>Tiến độ</th>
+                  <th>Ngày ghi danh</th>
+                  <th>Hoạt động gần nhất</th>
+                  <th class="th-center">Trạng thái</th>
+                  <th class="th-right">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (i of [1, 2, 3]; track i) {
+                  <tr>
+                    <td colspan="7"><div class="skeleton-row"></div></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        <!-- Error -->
+        @if (!loading() && error()) {
+          <div class="empty-state">
+            <div class="empty-state-icon">
+              <svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
+              </svg>
+            </div>
+            <h3 class="empty-state-title">Không thể tải danh sách học viên</h3>
+            <p class="empty-state-text">{{ error() }}</p>
+            <button type="button" class="retry-link" (click)="onReload()">Thử lại</button>
+          </div>
+        }
+
+        <!-- Empty -->
+        @if (!loading() && !error() && paged().length === 0) {
+          <div class="empty-state">
+            <div class="empty-state-icon">
+              <svg width="40" height="40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 014-4h4a4 4 0 014 4v2h-3m-5-9a4 4 0 100-8 4 4 0 000 8zm8 0a3 3 0 100-6 3 3 0 000 6z"/>
+              </svg>
+            </div>
+            <h3 class="empty-state-title">Không có học viên</h3>
+            <p class="empty-state-text">
+              @if (keyword || status) {
+                Thử bỏ bộ lọc hoặc tìm với từ khóa khác
+              } @else {
+                Khóa học này chưa có học viên ghi danh
+              }
+            </p>
+            @if (keyword || status) {
+              <button type="button" class="retry-link" (click)="clearStudentFilters()">Xóa bộ lọc</button>
+            }
+          </div>
+        }
+
+        <!-- Student table -->
+        @if (!loading() && !error() && paged().length > 0) {
+          <div class="table-card">
+            <table class="students-table">
+              <thead>
+                <tr>
+                  <th>Học viên</th>
+                  <th>Email</th>
+                  <th>Tiến độ</th>
+                  <th>Ngày ghi danh</th>
+                  <th>Hoạt động gần nhất</th>
+                  <th class="th-center">Trạng thái</th>
+                  <th class="th-right">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (s of paged(); track trackById($index, s)) {
+                  <tr>
+                    <td>
+                      <div class="student-cell">
+                        <div class="student-avatar" aria-hidden="true">{{ getInitials(s.name) }}</div>
+                        <span class="student-name">{{ s.name }}</span>
+                      </div>
+                    </td>
+                    <td class="cell-muted">{{ s.email }}</td>
+                    <td>
+                      <div class="progress-cell">
+                        <div class="progress-track" [attr.aria-label]="'Tiến độ ' + s.progress + '%'" role="progressbar" [attr.aria-valuenow]="s.progress" aria-valuemin="0" aria-valuemax="100">
+                          <div class="progress-fill" [style.width.%]="s.progress"></div>
+                        </div>
+                        <span class="progress-text">{{ s.progress }}%</span>
+                      </div>
+                    </td>
+                    <td class="cell-muted">{{ formatDate(s.enrolledAt) || '—' }}</td>
+                    <td class="cell-muted">{{ formatDate(s.lastAccessed) || 'Chưa truy cập' }}</td>
+                    <td class="cell-center">
+                      <span
+                        class="status-badge"
+                        [class.badge-active]="s.status === 'ACTIVE'"
+                        [class.badge-completed]="s.status === 'COMPLETED'"
+                        [class.badge-suspended]="s.status === 'SUSPENDED'"
+                        [class.badge-muted]="s.status === 'DROPPED' || s.status === 'EXPIRED'">
+                        {{ getStudentStatusLabel(s.status) }}
+                      </span>
+                    </td>
+                    <td class="cell-right">
+                      <div class="action-buttons">
+                        <a [routerLink]="['/teacher/students', s.id]" class="action-btn" [attr.aria-label]="'Xem chi tiết học viên ' + s.name">Chi tiết</a>
+                        <button type="button" class="action-btn" [attr.aria-label]="'Nhắn tin cho ' + s.name" (click)="sendMessage(s.id)">Nhắn tin</button>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination: dùng shared component đồng bộ -->
+          @if (totalPages() > 1) {
+            <app-pagination
+              class="pagination-shared"
+              [currentPage]="pageIndex()"
+              [totalPages]="totalPages()"
+              [totalItems]="total()"
+              [itemsPerPage]="studentPageSize"
+              (pageChange)="goToPage($event)" />
+          }
+        }
+      </div>
+    }
+  </div>
+</div>

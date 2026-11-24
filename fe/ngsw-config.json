@@ -1,0 +1,105 @@
+{
+  "$schema": "./node_modules/@angular/service-worker/config/schema.json",
+  "index": "/index.csr.html",
+  "assetGroups": [
+    {
+      "name": "app-shell",
+      "installMode": "prefetch",
+      "updateMode": "prefetch",
+      "resources": {
+        "files": [
+          "/favicon.ico",
+          "/index.csr.html",
+          "/manifest.webmanifest",
+          "/*.css",
+          "/main-*.js",
+          "/polyfills-*.js"
+        ]
+      }
+    },
+    {
+      "name": "lazy-chunks",
+      "installMode": "prefetch",
+      "updateMode": "lazy",
+      "resources": {
+        "files": [
+          "/chunk-*.js"
+        ]
+      }
+    },
+    {
+      "name": "assets",
+      "installMode": "lazy",
+      "updateMode": "prefetch",
+      "resources": {
+        "files": [
+          "/assets/**",
+          "/**/*.(svg|cur|jpg|jpeg|png|apng|webp|avif|gif|otf|ttf|woff|woff2)"
+        ]
+      }
+    }
+  ],
+  "dataGroups": [
+    {
+      "name": "course-catalog",
+      "urls": [
+        "/api/v3/courses",
+        "/api/v3/courses?*",
+        "/api/v3/categories",
+        "/api/v3/categories/**"
+      ],
+      "cacheConfig": {
+        "maxSize": 100,
+        "maxAge": "7d",
+        "strategy": "freshness",
+        "timeout": "5s"
+      }
+    },
+    {
+      "name": "course-content",
+      "urls": [
+        "/api/v3/courses/*/chapters",
+        "/api/v3/courses/*/chapters/**",
+        "/api/v3/courses/*/lessons/**"
+      ],
+      "cacheConfig": {
+        "maxSize": 500,
+        "maxAge": "30d",
+        "strategy": "freshness",
+        "timeout": "8s"
+      }
+    },
+    {
+      "name": "images",
+      "urls": [
+        "/api/v3/files/view/**"
+      ],
+      "cacheConfig": {
+        "maxSize": 200,
+        "maxAge": "30d",
+        "strategy": "performance"
+      }
+    },
+    {
+      "name": "video-playback-bypass",
+      "_comment": "Defense-in-depth: explicit freshness + short timeout cho video-assets endpoints. Trước đây không match dataGroup nào (pass-through), nhưng add explicit để: (1) ensure NGSW không bao giờ cache responses (manifest có JWT expire), (2) tránh stale 5xx replay sau server-side fix. Issue 2026-04-30: 504 cached state blocked playback sau khi backend đã fix.",
+      "urls": [
+        "/api/v3/video-assets/**"
+      ],
+      "cacheConfig": {
+        "maxSize": 1,
+        "maxAge": "10s",
+        "strategy": "freshness",
+        "timeout": "2s"
+      }
+    }
+  ],
+  "navigationUrls": [
+    "/**",
+    "!/__**",
+    "!/api/**",
+    "!/actuator/**"
+  ],
+  "_comment_navigation": "freshness (network-first) over performance (cache-first): HTML carries response headers (CSP, Cache-Control, security policy). With cache-first, server-side header policy changes never reach already-installed users — they keep enforcing the CSP/policy frozen at SW install time. Trade-off: ~30-100ms HTML latency vs always-correct security policy. CSP cache-stale bug 2026-05-02 (YouTube iframe API blocked by old CSP cached pre-fix) made the case for freshness.",
+  "navigationRequestStrategy": "freshness"
+}

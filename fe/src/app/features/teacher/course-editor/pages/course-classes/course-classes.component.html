@@ -1,0 +1,380 @@
+<div class="course-classes-page">
+<div class="editor-classes-panel bg-white rounded-lg shadow-sm border border-gray-200">
+    <!-- Header -->
+    <div class="editor-classes-panel__header px-6 py-3 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+        <div>
+            <h2 class="text-base font-semibold text-slate-900">Quản lý lớp học</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Tạo và quản lý các lớp học trong khóa học.</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <button (click)="openVersionHistory()"
+                type="button"
+                class="px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-[#0056D2] hover:bg-[#0056D2]/5 rounded-lg transition-colors flex items-center gap-1.5"
+                title="Xem lịch sử phiên bản và đẩy bản mới cho nhiều lớp cùng lúc">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                Lịch sử phiên bản
+            </button>
+            <button (click)="openCreateDialog()"
+                class="editor-primary-button">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                Tạo lớp mới
+            </button>
+        </div>
+    </div>
+
+    <!-- PAID UNENROLLED STUDENTS BANNER -->
+    @if (!isLoadingPaidStudents() && paidUnenrolledStudents().length > 0) {
+        <div class="px-6 py-4 bg-amber-50 border-b border-amber-200">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <span class="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
+                        <mat-icon class="text-amber-600">payments</mat-icon>
+                    </span>
+                    <div>
+                        <h3 class="text-sm font-bold text-amber-900">
+                            {{ paidUnenrolledStudents().length }} học viên đã thanh toán chưa được xếp lớp
+                        </h3>
+                        <p class="text-xs text-amber-700 mt-0.5">
+                            Học viên đã thanh toán và đang chờ giảng viên xếp vào lớp học.
+                        </p>
+                    </div>
+                </div>
+                <button (click)="isPaidStudentsSectionExpanded.set(!isPaidStudentsSectionExpanded())"
+                        class="px-4 py-2 text-sm font-bold text-amber-700 bg-amber-100 hover:bg-amber-200 rounded-lg transition-colors flex items-center gap-2">
+                    <mat-icon class="text-sm">
+                        {{ isPaidStudentsSectionExpanded() ? 'expand_less' : 'expand_more' }}
+                    </mat-icon>
+                    {{ isPaidStudentsSectionExpanded() ? 'Thu gọn' : 'Xem danh sách' }}
+                </button>
+            </div>
+
+            @if (isPaidStudentsSectionExpanded()) {
+                <div class="mt-4 bg-white rounded-xl border border-amber-200 overflow-hidden">
+                    <!-- Toolbar -->
+                    <div class="px-4 py-3 bg-amber-50/50 border-b border-amber-200 flex items-center justify-between">
+                        <label class="flex items-center gap-2 text-sm text-amber-800 cursor-pointer">
+                            <input type="checkbox"
+                                   [checked]="isAllPaidStudentsSelected()"
+                                   (change)="selectAllPaidStudents()"
+                                   class="w-4 h-4 rounded border-amber-300 text-amber-600 focus:ring-amber-500">
+                            <span>Chọn tất cả ({{ paidUnenrolledStudents().length }})</span>
+                        </label>
+                        <button (click)="enrollSelectedPaidStudents()"
+                                [disabled]="selectedPaidStudentIds().size === 0 || isEnrollingPaid()"
+                                class="px-4 py-2 bg-[#0056D2] text-white text-sm font-bold rounded-lg hover:bg-[#004BB5] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2">
+                            @if (isEnrollingPaid()) {
+                                <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                </svg>
+                            }
+                            <span>Xếp {{ selectedPaidStudentIds().size }} học viên</span>
+                        </button>
+                    </div>
+
+                    <!-- Student List -->
+                    <div class="divide-y divide-amber-100">
+                        @for (student of paidUnenrolledStudents(); track student.studentId) {
+                            <div class="px-4 py-3 flex items-center gap-4 hover:bg-amber-50/50 transition-colors">
+                                <input type="checkbox"
+                                       [checked]="isPaidStudentSelected(student.studentId)"
+                                       (change)="togglePaidStudentSelection(student.studentId)"
+                                       class="w-4 h-4 rounded border-amber-300 text-amber-600 focus:ring-amber-500 flex-shrink-0">
+
+                                <div class="w-10 h-10 bg-[#0056D2]/10 rounded-full flex items-center justify-center text-[#0056D2] font-bold text-sm flex-shrink-0">
+                                    {{ getStudentInitials(student.fullName, student.email) }}
+                                </div>
+
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm font-bold text-gray-900 truncate">{{ student.fullName || 'Chưa cập nhật' }}</p>
+                                    <p class="text-xs text-gray-500 truncate">{{ student.email }}</p>
+                                </div>
+
+                                <div class="text-right flex-shrink-0">
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="px-2 py-1 text-[10px] font-bold bg-green-100 text-green-700 rounded uppercase">Đã thanh toán</span>
+                                        <span class="text-xs text-gray-500">{{ formatPaymentDate(student.paidAt) }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    <!-- FILTER BAR -->
+    <div class="editor-classes-panel__filters p-4 border-b border-gray-200 bg-white flex flex-wrap gap-3 items-center justify-between">
+        <!-- Search -->
+        <div class="relative flex-1 min-w-[200px] max-w-md">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+            </div>
+            <input type="text" [formControl]="searchControl"
+                class="block w-full pl-10 pr-3 py-1.5 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-[#0056D2] focus:border-[#0056D2] sm:text-sm"
+                placeholder="Tìm theo tên hoặc mã lớp...">
+        </div>
+
+        <!-- Year Filter -->
+        <select (change)="onYearChange($event)"
+            class="block pl-3 pr-8 py-1.5 text-sm border-gray-300 focus:outline-none focus:ring-[#0056D2] focus:border-[#0056D2] rounded-md">
+            @for (y of years(); track y) {
+            <option [value]="y" [selected]="y === selectedYear()">{{ y }}–{{ y + 1 }}</option>
+            }
+        </select>
+
+        <!-- Semester Filter -->
+        <select (change)="onSemesterChange($event)"
+            class="block pl-3 pr-8 py-1.5 text-sm border-gray-300 focus:outline-none focus:ring-[#0056D2] focus:border-[#0056D2] rounded-md">
+            <option value="">Tất cả học kỳ</option>
+            @for (s of semesters; track s) {
+            <option [value]="s">{{ s }}</option>
+            }
+        </select>
+
+        <!-- Status Filter -->
+        <select (change)="onStatusChange($event)"
+            class="block pl-3 pr-8 py-1.5 text-sm border-gray-300 focus:outline-none focus:ring-[#0056D2] focus:border-[#0056D2] rounded-md">
+            <option value="">Tất cả trạng thái</option>
+            <option value="OPEN">Đang mở</option>
+            <option value="CLOSED">Đã đóng</option>
+        </select>
+    </div>
+
+    <!-- TABLE -->
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-4 py-2.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Tên lớp</th>
+                    <th class="px-4 py-2.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Giảng viên</th>
+                    <th class="px-4 py-2.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Thời gian</th>
+                    <th class="px-4 py-2.5 text-[11px] font-semibold text-center text-slate-500 uppercase tracking-wide">Sĩ số</th>
+                    <th class="px-4 py-2.5 text-[11px] font-semibold text-right text-slate-500 uppercase tracking-wide">Thao tác</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                <!-- Loading -->
+                @if (isLoading()) {
+                <tr>
+                    <td colspan="5" class="px-4 py-10 text-center text-slate-400 text-sm" role="status" aria-label="Đang tải danh sách lớp học">
+                        <svg class="w-5 h-5 animate-spin mx-auto mb-2 text-[#0056D2]" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        </svg>
+                        Đang tải...
+                    </td>
+                </tr>
+                }
+
+                <!-- Empty -->
+                @if (!isLoading() && classes().length === 0) {
+                <tr>
+                    <td colspan="5" class="px-4 py-10 text-center">
+                        <p class="text-sm text-slate-500">Chưa có lớp học nào.</p>
+                        <p class="text-xs text-slate-400 mt-1">Nhấn "Tạo lớp mới" để bắt đầu.</p>
+                    </td>
+                </tr>
+                }
+
+                <!-- Rows -->
+                @for (cls of classes(); track cls.id) {
+                <tr class="hover:bg-[#0056D2]/[0.03] transition-colors">
+                    <td class="px-4 py-2.5 whitespace-nowrap">
+                        <div>
+                            <span class="text-sm font-medium text-slate-900">{{ cls.name }}</span>
+                            <span class="block text-[11px] text-slate-400 tabular-nums">{{ cls.code }}</span>
+                        </div>
+                    </td>
+
+                    <td class="px-4 py-2.5 whitespace-nowrap">
+                        <div class="flex items-center gap-2 text-sm text-slate-700">
+                            <span class="h-6 w-6 rounded-full bg-[#0056D2]/10 flex items-center justify-center text-[10px] font-bold text-[#0056D2] shrink-0">
+                                {{ (cls.teacherName || 'N')[0] }}
+                            </span>
+                            {{ cls.teacherName || 'Chưa phân công' }}
+                        </div>
+                    </td>
+
+                    <td class="px-4 py-2.5 whitespace-nowrap">
+                        <div class="text-xs text-slate-500">
+                            @if (cls.scheduleType === 'SEMESTER') {
+                                <span class="font-semibold text-[#004BB5]">{{ cls.semester }}</span>
+                            } @else {
+                                <span class="font-semibold text-purple-700">Tùy chỉnh</span>
+                            }
+                            <span class="block tabular-nums mt-0.5">{{ cls.startDate | date:'dd/MM/yyyy' }} – {{ cls.endDate | date:'dd/MM/yyyy' }}</span>
+                            <!-- Version badge: 4 distinct states -->
+                            <button type="button"
+                                    (click)="openVersionPicker(cls)"
+                                    class="inline-flex items-center gap-1 mt-1 group focus:outline-none focus:ring-2 focus:ring-[#0056D2]/40 rounded"
+                                    [attr.aria-label]="'Quản lý phiên bản cho lớp ' + cls.name">
+                                @if (!cls.latestPublicationNumber) {
+                                    <!-- State A: Course never published → student sees nothing -->
+                                    <span class="px-1 py-0.5 text-[9px] font-bold bg-red-50 text-red-700 border border-red-200 rounded group-hover:bg-red-100"
+                                          title="Khoá học chưa từng được xuất bản. Học viên trong lớp này KHÔNG thấy nội dung. Bấm 'Xuất bản' ở đầu trang để công bố.">
+                                        Khoá chưa phát hành
+                                    </span>
+                                } @else if (!cls.publicationNumber) {
+                                    <!-- State B: Has publication, class auto-follows latest (NORMAL) -->
+                                    <span class="px-1 py-0.5 text-[9px] font-bold bg-blue-50 text-[#0056D2] border border-blue-200 rounded group-hover:bg-blue-100"
+                                          title="Lớp tự động theo bản mới nhất (v{{ cls.latestPublicationNumber }}). Phù hợp lớp mới mở. Bấm để ghim phiên bản cụ thể nếu cần ổn định nội dung giữa kỳ.">
+                                        Theo bản mới (v{{ cls.latestPublicationNumber }})
+                                    </span>
+                                } @else if (cls.updateAvailable) {
+                                    <!-- State D: Pinned to older + newer exists -->
+                                    <span class="px-1 py-0.5 text-[9px] font-bold bg-slate-100 text-slate-700 border border-slate-200 rounded tabular-nums group-hover:bg-slate-200"
+                                          title="Lớp đang ghim ở v{{ cls.publicationNumber }}. Khoá học đã có bản v{{ cls.latestPublicationNumber }} mới hơn — bấm để cập nhật.">
+                                        v{{ cls.publicationNumber }}
+                                    </span>
+                                    <span class="px-1 py-0.5 text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded animate-pulse"
+                                          title="Có bản v{{ cls.latestPublicationNumber }} mới hơn">
+                                        v{{ cls.latestPublicationNumber }} mới
+                                    </span>
+                                } @else {
+                                    <!-- State C: Pinned to latest -->
+                                    <span class="px-1 py-0.5 text-[9px] font-bold bg-slate-100 text-slate-600 border border-slate-200 rounded tabular-nums group-hover:bg-slate-200"
+                                          title="Lớp đang ghim ở v{{ cls.publicationNumber }} (bản mới nhất). Bấm để đổi sang bản khác hoặc chuyển sang chế độ tự theo bản mới.">
+                                        v{{ cls.publicationNumber }}
+                                    </span>
+                                }
+                            </button>
+                        </div>
+                    </td>
+
+                    <td class="px-4 py-2.5 whitespace-nowrap text-center">
+                        <div class="inline-flex flex-col items-center gap-0.5">
+                            <span class="text-xs font-medium tabular-nums"
+                                  [class.text-red-600]="(cls.capacityPercent ?? 0) >= 100"
+                                  [class.text-amber-600]="(cls.capacityPercent ?? 0) >= 80 && (cls.capacityPercent ?? 0) < 100"
+                                  [class.text-slate-700]="(cls.capacityPercent ?? 0) < 80">
+                                {{ cls.studentCount || 0 }}/{{ cls.maxStudents }}
+                            </span>
+                            <div class="w-12 h-1 bg-slate-200 rounded-full overflow-hidden">
+                                <div class="h-full rounded-full transition-all"
+                                     [style.width.%]="cls.capacityPercent ?? 0"
+                                     [class.bg-red-500]="(cls.capacityPercent ?? 0) >= 100"
+                                     [class.bg-amber-400]="(cls.capacityPercent ?? 0) >= 80 && (cls.capacityPercent ?? 0) < 100"
+                                     [class.bg-[#0056D2]]="(cls.capacityPercent ?? 0) < 80">
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+
+                    <td class="px-4 py-2.5 whitespace-nowrap text-right">
+                        <div class="flex items-center justify-end gap-1">
+                            <button (click)="quickEnroll(cls)"
+                                class="w-7 h-7 flex items-center justify-center rounded-md text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 transition-colors" title="Thêm học viên"
+                                [attr.aria-label]="'Thêm học viên vào ' + cls.name">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                                </svg>
+                            </button>
+                            <button (click)="viewStudents(cls)"
+                                class="w-7 h-7 flex items-center justify-center rounded-md text-[#0056D2] hover:text-[#004BB5] hover:bg-[#0056D2]/10 transition-colors"
+                                title="Danh sách học viên"
+                                [attr.aria-label]="'Xem danh sách học viên ' + cls.name">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                            </button>
+                            <button (click)="manageTeachers(cls)"
+                                class="w-7 h-7 flex items-center justify-center rounded-md text-purple-400 hover:text-purple-600 hover:bg-purple-50 transition-colors" title="Đồng giảng viên"
+                                [attr.aria-label]="'Quản lý đồng giảng viên ' + cls.name">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                            </button>
+                            <button (click)="editClass(cls)"
+                                class="w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-[#0056D2] hover:bg-[#0056D2]/10 transition-colors" title="Chỉnh sửa"
+                                [attr.aria-label]="'Chỉnh sửa ' + cls.name">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                            </button>
+                            <button (click)="deleteClass(cls.id)"
+                                class="w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors" title="Xóa"
+                                [attr.aria-label]="'Xóa ' + cls.name">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <!-- PAGINATION -->
+    @if (totalElements() > 0) {
+    <div class="px-5 py-2.5 border-t border-slate-200 bg-slate-50/60 flex items-center justify-between">
+        <p class="text-xs text-slate-500">
+            Hiển thị <span class="font-medium text-slate-700">{{ pageInfo().start }}</span>–<span class="font-medium text-slate-700">{{ pageInfo().end }}</span>
+            trong <span class="font-medium text-slate-700">{{ totalElements() }}</span> lớp
+        </p>
+        <nav class="inline-flex rounded-md overflow-hidden border border-slate-200" aria-label="Phân trang">
+            <button (click)="changePage(currentPage() - 1)" [disabled]="currentPage() === 0"
+                class="px-3 py-1 text-xs font-medium text-slate-600 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed border-r border-slate-200">
+                Trước
+            </button>
+            <span class="px-3 py-1 text-xs font-medium text-slate-700 bg-white tabular-nums">
+                {{ currentPage() + 1 }}/{{ totalPages() }}
+            </span>
+            <button (click)="changePage(currentPage() + 1)" [disabled]="isLastPage()"
+                class="px-3 py-1 text-xs font-medium text-slate-600 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed border-l border-slate-200">
+                Tiếp
+            </button>
+        </nav>
+    </div>
+    }
+</div>
+
+<!-- Enrollment Drawer -->
+<app-add-student-drawer [isOpen]="isDrawerOpen()" (isOpenChange)="isDrawerOpen.set($event)"
+    [classId]="selectedClassId()" [defaultTab]="studentDrawerDefaultTab()" (onSaved)="loadClasses()">
+</app-add-student-drawer>
+
+<!-- Co-teacher Drawer -->
+<app-class-teachers-drawer [isOpen]="isTeacherDrawerOpen()" (isOpenChange)="isTeacherDrawerOpen.set($event)"
+    [classId]="teacherDrawerClassId()" (onSaved)="loadClasses()">
+</app-class-teachers-drawer>
+
+<!-- Version Picker Drawer (per-class) -->
+@if (versionPickerClass(); as vpc) {
+<app-version-picker-drawer
+    [isOpen]="isVersionPickerOpen()"
+    [classId]="vpc.id"
+    [className]="vpc.name"
+    [courseId]="courseId()"
+    [currentPublicationId]="vpc.courseVersionId ?? null"
+    [currentVersionMode]="vpc.versionMode ?? 'PINNED'"
+    (closeRequested)="closeVersionPicker()"
+    (saved)="onVersionAdopted()">
+</app-version-picker-drawer>
+}
+
+<!-- Version History Drawer (course-level, bulk adopt) -->
+<app-version-history-drawer
+    [isOpen]="isVersionHistoryOpen()"
+    [courseId]="courseId()"
+    (closeRequested)="closeVersionHistory()"
+    (bulkAdopted)="onVersionAdopted()">
+</app-version-history-drawer>
+</div>

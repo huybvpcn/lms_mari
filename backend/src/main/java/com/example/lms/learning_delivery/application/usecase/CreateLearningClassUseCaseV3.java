@@ -1,0 +1,107 @@
+package com.example.lms.learning_delivery.application.usecase;
+
+import com.example.lms.course_authoring.application.port.CoursePublicationPort;
+import com.example.lms.identity.infrastructure.persistence.repository.UserJpaRepository;
+import com.example.lms.learning_delivery.domain.model.LearningClass;
+import com.example.lms.learning_delivery.domain.repository.LearningClassRepository;
+import com.example.lms.learning_delivery.infrastructure.persistence.ClassTeacherJpaRepository;
+import com.example.lms.learning_delivery.infrastructure.persistence.entity.ClassTeacherJpaEntity;
+import com.example.lms.shared.exception.BusinessRuleException;
+import com.example.lms.shared.exception.EntityNotFoundException;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
+import java.util.UUID;
+
+/**
+ * Use case for creating a learning class.
+ * V3 - Uses pure domain models only.
+ */
+@Service("createLearningClassUseCaseV3")
+@RequiredArgsConstructor
+@Slf4j
+public class CreateLearningClassUseCaseV3 {
+
+    private final LearningClassRepository classRepository;
+    private final CoursePublicationPort coursePublicationPort;
+    private final ClassTeacherJpaRepository classTeacherJpaRepository;
+    private final UserJpaRepository userJpaRepository;
+
+    public record CreateClassCommand(
+        UUID courseId,
+        UUID teacherId,
+        String code,
+        String name,
+        Instant startDate,
+        Instant endDate,
+        Integer maxStudents,
+        String scheduleType,
+        String semester
+    ) {}
+
+    @Transactional
+    public UUID execute(CreateClassCommand command) {
+        log.info("Creating learning class {} for course {} (V3)", command.name(), command.courseId());
+
+        // Validate code uniqueness if provided
+        if (command.code() != null && classRepository.existsByCode(command.code())) {
+            throw new BusinessRuleException("CLASS_CODE_EXISTS",
+                "Mã lớp học đã tồn tại: " + command.code());
+        }
+
+        // Validate teacherId exists
+        if (command.teacherId() != null) {
+            userJpaRepository.findById(command.teacherId())
+                    .orElseThrow(() -> new EntityNotFoundException("Giảng viên", command.teacherId()));
+        }
+
+        // Determine schedule type
+        LearningClass.ScheduleType scheduleType = LearningClass.ScheduleType.CUSTOM;
+        if (command.scheduleType() != null) {
+            try {
+                scheduleType = LearningClass.ScheduleType.valueOf(command.scheduleType());
+            } catch (IllegalArgumentException e) {
+                // Default to CUSTOM
+            }
+        }
+
+        UUID latestPublicationId = coursePublicationPort.findLatestPublicationId(command.courseId())
+                .orElse(null);
+
+        // Create domain model
+        LearningClass learningClass = LearningClass.builder()
+                .id(UUID.randomUUID())
+                .courseId(command.courseId())
+                .courseVersionId(latestPublicationId)
+                .versionMode(LearningClass.VersionMode.PINNED)
+                .teacherId(command.teacherId())
+                .code(command.code())
+                .name(command.name())
+                .status(LearningClass.ClassStatus.OPEN)
+                .maxStudents(command.maxStudents() != null ? command.maxStudents() : 50)
+                .startDate(command.startDate())
+                .endDate(command.endDate())
+                .scheduleType(scheduleType)
+                .semester(command.semester())
+                .createdAt(Instant.now())
+                .build();
+
+        LearningClass saved = classRepository.save(learningClass);
+
+        // Auto-insert PRIMARY teacher into class_teachers junction table
+        if (command.teacherId() != null) {
+            classTeacherJpaRepository.save(ClassTeacherJpaEntity.builder()
+                    .classId(saved.getId())
+                    .teacherId(command.teacherId())
+                    .role(ClassTeacherJpaEntity.TeacherRole.PRIMARY)
+                    .build());
+        }
+
+        log.info("Learning class {} created successfully with ID {}", command.name(), saved.getId());
+
+        return saved.getId();
+    }
+}

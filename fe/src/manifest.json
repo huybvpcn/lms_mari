@@ -1,0 +1,106 @@
+{
+  "name": "LMS Maritime - Hệ thống Đào tạo Hàng hải",
+  "short_name": "LMS Hàng hải",
+  "description": "Nền tảng đào tạo trực tuyến chuyên ngành hàng hải - hỗ trợ ngoại tuyến",
+  "start_url": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "background_color": "#ffffff",
+  "theme_color": "#0056D2",
+  "orientation": "any",
+  "scope": "/",
+  "lang": "vi",
+  "dir": "ltr",
+  "categories": ["education", "productivity"],
+  "icons": [
+    {
+      "src": "icons/icon-72x72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-128x128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-144x144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-152x152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-384x384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "assets/screenshots/mobile-home.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Danh sách khóa học"
+    },
+    {
+      "src": "assets/screenshots/desktop-home.png",
+      "sizes": "1920x1080",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Bảng điều khiển học tập"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Khóa học của tôi",
+      "short_name": "Khóa học",
+      "description": "Xem danh sách khóa học đã đăng ký",
+      "url": "/student/my-courses",
+      "icons": [{ "src": "icons/icon-96x96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Tiếp tục học",
+      "short_name": "Học tập",
+      "description": "Tiếp tục bài học gần nhất",
+      "url": "/learn",
+      "icons": [{ "src": "icons/icon-96x96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Trợ lý AI",
+      "short_name": "AI Chat",
+      "description": "Hỏi đáp với trợ lý AI Wiii",
+      "url": "/ai-chat",
+      "icons": [{ "src": "icons/icon-96x96.png", "sizes": "96x96" }]
+    }
+  ],
+  "prefer_related_applications": false,
+  "handle_links": "preferred"
+}

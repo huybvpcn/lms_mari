@@ -1,0 +1,448 @@
+    <div class="bg-slate-50 min-h-screen">
+      <div class="max-w-4xl mx-auto px-6 py-8">
+        <!-- Header -->
+        <div class="mb-8">
+          <div class="flex items-center justify-between">
+            <div>
+              <h1 class="text-2xl font-bold text-gray-900 mb-2">
+                <svg class="w-7 h-7 inline-block mr-2 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"></path>
+                </svg>
+                Cài đặt hệ thống
+              </h1>
+              <p class="text-gray-600">Cấu hình và quản lý các thiết lập hệ thống LMS</p>
+            </div>
+            <button (click)="saveSettings()"
+                    [disabled]="isSaving()"
+                    class="px-6 py-3 bg-[#0056D2] text-white rounded-xl hover:bg-[#004BB5] transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              @if (isSaving()) {
+                <svg class="w-4 h-4 inline mr-2 animate-spin" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"></path>
+                </svg>
+                Đang lưu...
+              } @else {
+                <svg class="w-4 h-4 inline mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                </svg>
+                Lưu cài đặt
+              }
+            </button>
+          </div>
+        </div>
+
+        <!-- Settings Tabs -->
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <!-- Tab Navigation -->
+          <div class="border-b border-gray-200">
+            <nav class="-mb-px flex space-x-8 px-6">
+              <button (click)="setActiveTab('general')"
+                      class="py-4 px-1 border-b-2 font-medium text-sm transition-colors"
+                      [class]="activeTab() === 'general' ? 'border-[#0056D2] text-[#0056D2]' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'">
+                <svg class="w-4 h-4 inline mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"></path>
+                </svg>
+                Tổng quan
+              </button>
+              <button (click)="setActiveTab('email')"
+                      class="py-4 px-1 border-b-2 font-medium text-sm transition-colors"
+                      [class]="activeTab() === 'email' ? 'border-[#0056D2] text-[#0056D2]' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'">
+                <svg class="w-4 h-4 inline mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"></path>
+                  <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"></path>
+                </svg>
+                Email
+              </button>
+              <button (click)="setActiveTab('payment')"
+                      class="py-4 px-1 border-b-2 font-medium text-sm transition-colors"
+                      [class]="activeTab() === 'payment' ? 'border-[#0056D2] text-[#0056D2]' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'">
+                <svg class="w-4 h-4 inline mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4zM18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z"></path>
+                </svg>
+                Thanh toán
+              </button>
+              <button (click)="setActiveTab('security')"
+                      class="py-4 px-1 border-b-2 font-medium text-sm transition-colors"
+                      [class]="activeTab() === 'security' ? 'border-[#0056D2] text-[#0056D2]' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'">
+                <svg class="w-4 h-4 inline mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"></path>
+                </svg>
+                Bảo mật
+              </button>
+            </nav>
+          </div>
+
+          <!-- Tab Content -->
+          <div class="p-6">
+            @if (activeTab() === 'general') {
+              <!-- General Settings -->
+              <div class="space-y-6">
+                <h3 class="text-lg font-semibold text-gray-900">Cài đặt tổng quan</h3>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Tên trang web</label>
+                    <input type="text"
+                           [ngModel]="settings()?.general?.siteName || ''"
+                           (ngModelChange)="updateGeneralSetting('siteName', $event)"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-[#0056D2] focus:border-[#0056D2]">
+                  </div>
+
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Mô tả trang web</label>
+                    <input type="text"
+                           [ngModel]="settings()?.general?.siteDescription || ''"
+                           (ngModelChange)="updateGeneralSetting('siteDescription', $event)"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-[#0056D2] focus:border-[#0056D2]">
+                  </div>
+                </div>
+
+                <div class="space-y-4">
+                  <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div>
+                      <h4 class="font-medium text-gray-900">Chế độ bảo trì</h4>
+                      <p class="text-sm text-gray-600">Tạm thời vô hiệu hóa trang web để bảo trì</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox"
+                             [ngModel]="settings()?.general?.maintenanceMode || false"
+                             (ngModelChange)="updateGeneralSetting('maintenanceMode', $event)"
+                             class="sr-only peer">
+                      <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[#0056D2]/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#0056D2]"></div>
+                    </label>
+                  </div>
+
+                  <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div>
+                      <h4 class="font-medium text-gray-900">Cho phép đăng ký</h4>
+                      <p class="text-sm text-gray-600">Cho phép người dùng mới đăng ký tài khoản</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox"
+                             [ngModel]="settings()?.general?.allowRegistration || false"
+                             (ngModelChange)="updateGeneralSetting('allowRegistration', $event)"
+                             class="sr-only peer">
+                      <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[#0056D2]/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#0056D2]"></div>
+                    </label>
+                  </div>
+
+                  <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div>
+                      <h4 class="font-medium text-gray-900">Yêu cầu xác thực email</h4>
+                      <p class="text-sm text-gray-600">Yêu cầu người dùng xác thực email khi đăng ký</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox"
+                             [ngModel]="settings()?.general?.requireEmailVerification || false"
+                             (ngModelChange)="updateGeneralSetting('requireEmailVerification', $event)"
+                             class="sr-only peer">
+                      <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[#0056D2]/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#0056D2]"></div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            }
+
+            @if (activeTab() === 'email') {
+              <!-- Email Settings -->
+              <div class="space-y-6">
+                <h3 class="text-lg font-semibold text-gray-900">Cài đặt email</h3>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">SMTP Host</label>
+                    <input type="text"
+                           [ngModel]="settings()?.email?.smtpHost || ''"
+                           (ngModelChange)="updateEmailSetting('smtpHost', $event)"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-[#0056D2] focus:border-[#0056D2]">
+                  </div>
+
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">SMTP Port</label>
+                    <input type="number"
+                           [ngModel]="settings()?.email?.smtpPort || 587"
+                           (ngModelChange)="updateEmailSetting('smtpPort', $event)"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-[#0056D2] focus:border-[#0056D2]">
+                  </div>
+
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">SMTP User</label>
+                    <input type="text"
+                           [ngModel]="settings()?.email?.smtpUser || ''"
+                           (ngModelChange)="updateEmailSetting('smtpUser', $event)"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-[#0056D2] focus:border-[#0056D2]">
+                  </div>
+
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">SMTP Password</label>
+                    <input type="password"
+                           [ngModel]="settings()?.email?.smtpPassword || ''"
+                           (ngModelChange)="updateEmailSetting('smtpPassword', $event)"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-[#0056D2] focus:border-[#0056D2]">
+                  </div>
+
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Email gửi</label>
+                    <input type="email"
+                           [ngModel]="settings()?.email?.fromEmail || ''"
+                           (ngModelChange)="updateEmailSetting('fromEmail', $event)"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-[#0056D2] focus:border-[#0056D2]">
+                  </div>
+
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Tên người gửi</label>
+                    <input type="text"
+                           [ngModel]="settings()?.email?.fromName || ''"
+                           (ngModelChange)="updateEmailSetting('fromName', $event)"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-[#0056D2] focus:border-[#0056D2]">
+                  </div>
+                </div>
+
+                <div class="bg-[#0056D2]/5 border border-[#0056D2]/20 rounded-lg p-4">
+                  <div class="flex">
+                    <svg class="w-5 h-5 text-[#0056D2] mt-0.5 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                    </svg>
+                    <div>
+                      <h4 class="text-sm font-medium text-[#004BB5]">Lưu ý về cài đặt email</h4>
+                      <p class="text-sm text-[#004BB5] mt-1">Đảm bảo thông tin SMTP chính xác để hệ thống có thể gửi email thông báo và xác thực.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            }
+
+            @if (activeTab() === 'payment') {
+              <!-- Payment Gateway Status -->
+              <div class="space-y-6">
+                <div class="flex items-center justify-between">
+                  <h3 class="text-lg font-semibold text-gray-900">Cổng thanh toán</h3>
+                  <span class="text-xs text-gray-400">Cấu hình qua biến môi trường (.env.prod)</span>
+                </div>
+
+                <!-- Gateway enable/disable toggles -->
+                <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                  <div class="px-5 py-3 bg-gray-50 border-b border-gray-200">
+                    <h4 class="text-sm font-semibold text-gray-700">Kích hoạt cổng thanh toán</h4>
+                    <p class="text-xs text-gray-500 mt-0.5">Bật/tắt từng cổng — học viên sẽ chỉ thấy các cổng đang hoạt động</p>
+                  </div>
+                  <div class="divide-y divide-gray-100">
+                    <!-- VNPay toggle -->
+                    <div class="flex items-center justify-between px-5 py-4">
+                      <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-xs shrink-0">VN</div>
+                        <div>
+                          <p class="text-sm font-medium text-gray-900">VNPay</p>
+                          <p class="text-xs text-gray-500">Cổng thanh toán nội địa (VISA / thẻ ATM)</p>
+                        </div>
+                      </div>
+                      <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox"
+                               [ngModel]="settings()?.payment?.vnpayEnabled || false"
+                               (ngModelChange)="updatePaymentSetting('vnpayEnabled', $event)"
+                               class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[#0056D2]/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#0056D2]"></div>
+                      </label>
+                    </div>
+                    <!-- SePay toggle -->
+                    <div class="flex items-center justify-between px-5 py-4">
+                      <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-lg bg-emerald-600 flex items-center justify-center text-white font-bold text-xs shrink-0">SP</div>
+                        <div>
+                          <p class="text-sm font-medium text-gray-900">SePay</p>
+                          <p class="text-xs text-gray-500">Chuyển khoản ngân hàng QR — sepay.vn</p>
+                        </div>
+                      </div>
+                      <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox"
+                               [ngModel]="settings()?.payment?.sepayEnabled || false"
+                               (ngModelChange)="updatePaymentSetting('sepayEnabled', $event)"
+                               class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[#0056D2]/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#0056D2]"></div>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                @if (!gatewayStatus()) {
+                  <div class="animate-pulse space-y-4">
+                    <div class="h-32 bg-gray-100 rounded-xl"></div>
+                    <div class="h-32 bg-gray-100 rounded-xl"></div>
+                  </div>
+                } @else {
+                  <!-- VNPay Card -->
+                  <div class="border border-gray-200 rounded-xl overflow-hidden">
+                    <div class="flex items-center justify-between px-5 py-4 bg-gray-50 border-b border-gray-200">
+                      <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-sm">VN</div>
+                        <div>
+                          <p class="font-semibold text-gray-900">VNPay</p>
+                          <p class="text-xs text-gray-500">Cổng thanh toán nội địa Việt Nam</p>
+                        </div>
+                      </div>
+                      @if (gatewayStatus()!.vnpay.enabled) {
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                          <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                          Đang hoạt động
+                        </span>
+                      } @else {
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                          <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                          Sandbox (dev)
+                        </span>
+                      }
+                    </div>
+                    <div class="px-5 py-4 space-y-2 text-sm">
+                      <div class="flex justify-between">
+                        <span class="text-gray-500">Môi trường</span>
+                        <span class="font-medium text-gray-800">{{ gatewayStatus()!.vnpay.sandbox ? 'Sandbox / Testing' : 'Production' }}</span>
+                      </div>
+                      <div class="flex justify-between">
+                        <span class="text-gray-500">IPN Callback</span>
+                        <code class="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-700">/api/v3/payments/vnpay-ipn</code>
+                      </div>
+                      <p class="text-xs text-gray-400 pt-1">{{ gatewayStatus()!.vnpay.note }}</p>
+                    </div>
+                  </div>
+
+                  <!-- SePay Card -->
+                  <div class="border border-gray-200 rounded-xl overflow-hidden">
+                    <div class="flex items-center justify-between px-5 py-4 bg-gray-50 border-b border-gray-200">
+                      <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-lg bg-emerald-600 flex items-center justify-center text-white font-bold text-sm">SP</div>
+                        <div>
+                          <p class="font-semibold text-gray-900">SePay</p>
+                          <p class="text-xs text-gray-500">Chuyển khoản ngân hàng QR — sepay.vn</p>
+                        </div>
+                      </div>
+                      @if (gatewayStatus()!.sepay.enabled) {
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                          <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                          Đang hoạt động
+                        </span>
+                      } @else {
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                          <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+                          Chưa kích hoạt
+                        </span>
+                      }
+                    </div>
+                    <div class="px-5 py-4 space-y-2.5 text-sm">
+                      @if (gatewayStatus()!.sepay.accountNumber) {
+                        <div class="flex justify-between">
+                          <span class="text-gray-500">Ngân hàng</span>
+                          <span class="font-medium text-gray-800">{{ gatewayStatus()!.sepay.bankCode }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                          <span class="text-gray-500">Số tài khoản</span>
+                          <span class="font-mono font-medium text-gray-800">{{ gatewayStatus()!.sepay.accountNumber }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                          <span class="text-gray-500">Chủ tài khoản</span>
+                          <span class="font-medium text-gray-800">{{ gatewayStatus()!.sepay.accountName }}</span>
+                        </div>
+                      }
+                      <div class="flex justify-between items-center">
+                        <span class="text-gray-500">Webhook URL</span>
+                        <code class="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-700 truncate max-w-[280px]">{{ gatewayStatus()!.sepay.webhookUrl }}</code>
+                      </div>
+                      <div class="flex justify-between">
+                        <span class="text-gray-500">Webhook đã cấu hình</span>
+                        @if (gatewayStatus()!.sepay.webhookConfigured) {
+                          <span class="text-green-600 font-medium">✓ Có</span>
+                        } @else {
+                          <span class="text-amber-600 font-medium">✗ Chưa</span>
+                        }
+                      </div>
+                    </div>
+                    @if (gatewayStatus()!.sepay.hint) {
+                      <div class="px-5 pb-4">
+                        <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-700">
+                          <strong>Cách bật:</strong> {{ gatewayStatus()!.sepay.hint }}
+                        </div>
+                      </div>
+                    }
+                  </div>
+
+                  <!-- Env vars reference -->
+                  <div class="bg-gray-900 rounded-xl p-4 text-xs font-mono">
+                    <p class="text-gray-400 mb-2"># .env.prod — biến môi trường cần thiết</p>
+                    <p class="text-green-400">SEPAY_ENABLED=true</p>
+                    <p class="text-green-400">SEPAY_BANK_CODE=MBBank</p>
+                    <p class="text-green-400">SEPAY_ACCOUNT_NUMBER=0394769866</p>
+                    <p class="text-green-400">SEPAY_ACCOUNT_NAME=NGUYEN MANH HUNG</p>
+                    <p class="text-green-400">SEPAY_WEBHOOK_API_KEY=&lt;key-from-sepay.vn&gt;</p>
+                  </div>
+                }
+              </div>
+            }
+
+            @if (activeTab() === 'security') {
+              <!-- Security Settings -->
+              <div class="space-y-6">
+                <h3 class="text-lg font-semibold text-gray-900">Cài đặt bảo mật</h3>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Thời gian hết hạn phiên (giờ)</label>
+                    <input type="number"
+                           [ngModel]="settings()?.security?.sessionTimeout || 24"
+                           (ngModelChange)="updateSecuritySetting('sessionTimeout', $event)"
+                           min="1"
+                           max="168"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-[#0056D2] focus:border-[#0056D2]">
+                  </div>
+
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Số lần đăng nhập tối đa</label>
+                    <input type="number"
+                           [ngModel]="settings()?.security?.maxLoginAttempts || 5"
+                           (ngModelChange)="updateSecuritySetting('maxLoginAttempts', $event)"
+                           min="3"
+                           max="10"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-[#0056D2] focus:border-[#0056D2]">
+                  </div>
+
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Độ dài mật khẩu tối thiểu</label>
+                    <input type="number"
+                           [ngModel]="settings()?.security?.passwordMinLength || 8"
+                           (ngModelChange)="updateSecuritySetting('passwordMinLength', $event)"
+                           min="6"
+                           max="20"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-[#0056D2] focus:border-[#0056D2]">
+                  </div>
+                </div>
+
+                <div class="space-y-4">
+                  <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div>
+                      <h4 class="font-medium text-gray-900">Yêu cầu xác thực hai yếu tố</h4>
+                      <p class="text-sm text-gray-600">Yêu cầu người dùng sử dụng 2FA để tăng cường bảo mật</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox"
+                             [ngModel]="settings()?.security?.requireTwoFactor || false"
+                             (ngModelChange)="updateSecuritySetting('requireTwoFactor', $event)"
+                             class="sr-only peer">
+                      <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[#0056D2]/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#0056D2]"></div>
+                    </label>
+                  </div>
+                </div>
+
+                <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                  <div class="flex">
+                    <svg class="w-5 h-5 text-amber-400 mt-0.5 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                    </svg>
+                    <div>
+                      <h4 class="text-sm font-medium text-amber-800">Cài đặt bảo mật quan trọng</h4>
+                      <p class="text-sm text-amber-700 mt-1">Thay đổi các cài đặt bảo mật có thể ảnh hưởng đến trải nghiệm người dùng. Hãy cân nhắc kỹ trước khi thay đổi.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+    </div>
